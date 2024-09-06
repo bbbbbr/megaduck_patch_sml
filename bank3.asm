@@ -860,7 +860,11 @@ ContinueSquareSFX:
 	xor a
 	ld [$DFE1], a
 	ldh [rNR10], a
+IF DEF(TARGET_MEGADUCK)
+    ld a, $80 ; Nybble swap
+ELSE
 	ld a, $08
+ENDC
 	ldh [rNR12], a
 	ld a, $80
 	ldh [rNR14], a
@@ -996,7 +1000,7 @@ ContinueInjurySFX::
 	ld a, [hl]
 	and a
 	jp z, ContinueSquareSFX.stop
-	ld c, LOW(rNR12)
+	ld c, LOW(rNR12)  ; TODO: MegaDuck: May need a nybble swap here
 	ld [$FF00+c], a
 	inc c
 	inc c
@@ -1106,7 +1110,7 @@ ContinueDeathCrySFX:: ; 697C
 	ld a, [hl]
 	and a
 	jr z, ContinueNoiseSFX.stop
-	ldh [rNR43], a		; noise characteristics
+	ldh [rNR43], a		; noise characteristics  ; TODO: MegaDuck: May need a nybble swap here
 	ret
 
 FireBreathChannelData:: ; 6993
@@ -1134,7 +1138,11 @@ ContinueNoiseSFX:: ; 69AF
 .stop
 	xor a
 	ld [$DFF9], a
+IF DEF(TARGET_MEGADUCK)
+    ld a, $80
+ELSE
 	ld a, $08
+ENDC
 	ldh [rNR42], a		; mute noise channel, setup envelope?
 	ld a, $80
 	ldh [rNR44], a		; trigger noise, consecutive mode
@@ -1266,7 +1274,11 @@ _InitSound:: ; 6A33
 	ld a, $FF
 	ldh [rNR51], a	; enable all channels to both outputs
 .muteChannels
+IF DEF(TARGET_MEGADUCK)
+    ld a, $80
+ELSE
 	ld a, $08
+ENDC
 	ldh [rNR12], a
 	ldh [rNR22], a
 	ldh [rNR42], a	; volume to zero, enable envelope?
@@ -1537,7 +1549,7 @@ Jmp_6C00: ; 6C00
 	ld c, a
 	inc l
 	inc l
-	ld [hl], e					; DFx6- will go into NRx2
+	ld [hl], e					; DFx6- will go into NRx2 ; TODO : ?? MegaDuck nybble swap and more
 	inc l
 	ld [hl], d					; DFx7 - always 0 or 6F
 	inc l
@@ -1606,7 +1618,7 @@ Jmp_6C4C:
 	ld a, [hl]			; DF32?
 	cp a, $06
 	jr nz, .jmp_6C65
-	ld a, $40
+	ld a, AUDVOL_CH3_MED ; $40
 	ldh [rNR32], a		; wave channel volume
 .jmp_6C65
 	push hl
@@ -1835,7 +1847,7 @@ PlayMusic:: ; 6CBE
 	ld [$FF00+c], a			; NRx1
 	inc c
 	ld a, e
-	ld [$FF00+c], a			; NRx2
+	ld [$FF00+c], a			; NRx2 ; TODO : MegaDuck nybble swap and more
 	inc c
 	ldi a, [hl]				; DFx9 freq lo
 	ld [$FF00+c], a			; NRx3

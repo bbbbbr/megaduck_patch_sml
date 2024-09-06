@@ -11,6 +11,7 @@ SECTION "bank0", ROM0[$0000]
 SECTION "RST 0", ROM0[$0000]
 	jp Init
 
+
 ; Unused
 SECTION "RST 8", ROM0[$0008]
 	jp Init
@@ -69,7 +70,7 @@ VBlank:: ; $0060
 	cp a, $3A			; Game over? TODO
 	jr nz, .gameNotOver
 	ld hl, rLCDC
-	set 5, [hl]			; Turn on window
+	set LCDCF_B_WINON, [hl]			; Turn on window
 .gameNotOver
 	xor a
 	ldh [rSCX], a
@@ -121,7 +122,7 @@ LCDStatus::
 
 .turnOffWindow
 	ld hl, rLCDC
-	res 5, [hl]		; Turn off Window
+	res LCDCF_B_WINON, [hl]		; Turn off Window
 	ld a, $0F		; height of the HUD
 	ldh [rLYC], a
 	xor a
@@ -218,13 +219,13 @@ Init::	; 0185
 	ldh [rSCY], a
 	ldh [rSCX], a
 	ldh [$A4], a
-	ld a, $80
+	ld a, LCDCF_ON ; $80
 	ldh [rLCDC], a	; Turn LCD on, but don't display anything
 .wait
 	ldh a, [rLY]
 	cp a, $94 ; TODO magic
 	jr nz, .wait	; Waits for VBlank?
-	ld a, $3
+	ld a, (LCDCF_OBJON | LCDCF_BGON) ; $3
 	ldh [rLCDC], a	; Turn LCD off
 	ld a, $E4
 	ldh [rBGP], a
@@ -232,7 +233,7 @@ Init::	; 0185
 	ld a, $54
 	ldh [rOBP1], a
 	ld hl, rNR52
-	ld a, $80
+	ld a, AUDENA_ON ; $80
 	ldd [hl], a		; Turn the sound on
 	ld a, $FF
 	ldd [hl], a		; Output all sounds to both terminals
@@ -266,7 +267,12 @@ Init::	; 0185
 .clearOAMloop
 	ldd [hl], a
 	dec b
+IF DEF(TARGET_MEGADUCK)  ; FIXME : MegaDuck (due to an emulator patching memory corruption issue at the moment)
+    nop
+    nop
+ELSE
 	jr nz, .clearOAMloop
+ENDC
 
 	ld hl, $FFFE	; End of High RAM
 	ld b, $80		; Size of High RAM, off by one, bug?
@@ -581,7 +587,7 @@ GameState_0E::
 	ld [hl], $AC	; mushroom/mario head
 	xor a
 	ldh [rIF], a	; Clear all interrupts
-	ld a, $C3
+	ld a, (LCDCF_ON | LCDCF_WIN9C00 | LCDCF_OBJON | LCDCF_BGON); $C3
 	ldh [rLCDC], a	; Turn on LCD, BG, sprites, and change WIN tile map
 	ei
 	ld a, $0F		; TODO
@@ -906,8 +912,66 @@ PrepareHUD::
 	ret
 
 ; Normal gameplay. Tons of function calls, let's do this later...
+;INCBIN "baserom.gb", $0627, $06BC - $0627
 GameState_00::	; 627
-INCBIN "baserom.gb", $0627, $06BC - $0627
+    call Call_2198
+    call Call_84E
+    ldh  a, [hActiveRomBank]    ; hActiveRomBank = $FFFD
+    ldh  [hSavedRomBank], a ; hSavedRomBank = $FFE1
+    ld   a, $03
+    ldh  [hActiveRomBank], a    ; hActiveRomBank = $FFFD
+    ld   [rROMB0], a
+    call Call_4823.jmp_48FC
+    ld   bc, $C208 ; _RAM_C208_
+    ld   hl, Data_216D  ; Data_216D = $216D
+    call Call_490D
+    ld   bc, $C218 ; _RAM_C218_
+    ld   hl, Data_216D  ; Data_216D = $216D
+    call Call_490D
+    ld   bc, $C228 ; _RAM_C228_
+    ld   hl, Data_216D  ; Data_216D = $216D
+    call Call_490D
+    ld   bc, $C238 ; _RAM_C238_
+    ld   hl, Data_216D  ; Data_216D = $216D
+    call Call_490D
+    ld   bc, $C248 ; _RAM_C248_
+    ld   hl, Data_216D  ; Data_216D = $216D
+    call Call_490D
+    call $4A94 ; _LABEL_CA94_
+    call Jmp_4966.jmp_498B
+    call $4AEA ; _LABEL_CAEA_
+    call $4B3C ; _LABEL_CB3C_
+    call $4B6F ; _LABEL_CB6F_
+    call $4B8A ; _LABEL_CB8A_
+    call $4BB5 ; _LABEL_CBB5_
+    ldh  a, [hSavedRomBank] ; hSavedRomBank = $FFE1
+    ldh  [hActiveRomBank], a    ; hActiveRomBank = $FFFD
+    ld   [rROMB0], a
+    call Call_1F2D
+    call Call_2491
+    ldh  a, [hActiveRomBank]    ; hActiveRomBank = $FFFD
+    ldh  [hSavedRomBank], a ; hSavedRomBank = $FFE1
+    ld   a, $02
+    ldh  [hActiveRomBank], a    ; hActiveRomBank = $FFFD
+    ld   [rROMB0], a
+    call UpdateTimerAndFloaties
+    ldh  a, [hSavedRomBank] ; hSavedRomBank = $FFE1
+    ldh  [hActiveRomBank], a    ; hActiveRomBank = $FFFD
+    ld   [rROMB0], a
+    call Jmp_185D.call_198C
+    call Call_16F5
+    call Call_17BC
+    call Call_AEA
+    call Call_A2D
+    call Call_1F03
+    ld   hl, $C0CE ; _RAM_C0CE_
+    ld   a, [hl]
+    and  a
+    ret  z
+    dec  [hl]
+    call Call_2113
+    ret
+
 
 ; 06BC
 GameState_01::
@@ -1001,7 +1065,7 @@ GameState_02::
 	xor a
 	ldh [hGameState], a
 	ld [wInvincibilityTimer], a
-	ld a, $C3
+	ld a, (LCDCF_ON | LCDCF_WIN9C00 | LCDCF_OBJON | LCDCF_BGON); $C3
 	ldh [rLCDC], a
 	call StartLevelMusic
 	xor a
@@ -1091,7 +1155,7 @@ pauseOrReset:: ; 7DA
 	xor a, 1			; (un)pause game
 	ldh [hGamePaused], a
 	jr z, .unpaused
-	set 5, [hl]			; Display window with pause
+	set LCDCF_B_WINON, [hl]			; Display window with pause
 	ld a, 1				; Pause music
 .pauseMusic
 	ldh [hPauseUnpauseMusic], a
@@ -2064,7 +2128,7 @@ GameState_08:: ; D49
 .out
 	xor a
 	ldh [rIF], a
-	ld a, $C3
+	ld a, (LCDCF_ON | LCDCF_WIN9C00 | LCDCF_OBJON | LCDCF_BGON); $C3
 	ldh [rLCDC], a	; TODO
 	ei
 	ld a, $03
@@ -2093,7 +2157,7 @@ GameState_1B:: ; DF9
 	call UpdateLives.displayLives
 	xor a
 	ldh [rIF], a
-	ld a, $C3
+	ld a, (LCDCF_ON | LCDCF_WIN9C00 | LCDCF_OBJON | LCDCF_BGON); $C3
 	ldh [rLCDC], a
 	ei
 	ld a, $08
@@ -2161,7 +2225,7 @@ GameState_1E:: ; E5D
 	sub a, $20
 	ldh [$FFE0], a
 .waitHBlank
-	ldh a, [$FF41]
+	ldh a, [rSTAT] ; [$FF41]
 	and a, %11
 	jr nz, .waitHBlank
 	ld [hl], " "
@@ -2607,7 +2671,7 @@ GameState_29:: ; 1116
 	ldh [hTextCursorLo], a
 	ld a, $0F
 	ld [$DFE8], a
-	ld a, $C3
+	ld a, (LCDCF_ON | LCDCF_WIN9C00 | LCDCF_OBJON | LCDCF_BGON); $C3
 	ldh [rLCDC], a
 	ei
 	ld hl, hGameState
@@ -3289,7 +3353,7 @@ GameState_0A:: ; 162F
 	ldh [rIF], a
 	ldh [hGameState], a
 	ldh [hScrollX], a
-	ld a, $C3			; todo
+	ld a, (LCDCF_ON | LCDCF_WIN9C00 | LCDCF_OBJON | LCDCF_BGON); $C3			; todo
 	ld [rLCDC], a
 	ei
 	ret
@@ -3366,7 +3430,7 @@ GameState_0B:: ; 166C
 	ldh [$FFE9], a		; first col not yet loaded in. IMO $807 should do this
 	call InitEnemySlots
 	call Call_1ED4		; clears objects
-	ld a, $C3
+	ld a, (LCDCF_ON | LCDCF_WIN9C00 | LCDCF_OBJON | LCDCF_BGON); $C3
 	ldh [rLCDC], a
 	ld a, $0C
 	ldh [hGameState], a
@@ -4360,7 +4424,7 @@ GameState_3B:: ; 1CF0
 	dec c
 	jr nz, .loop	; copy the words "time up" into vram
 	ld hl, rLCDC
-	set 5, [hl]		; turn on window
+	set LCDCF_B_WINON, [hl]		; turn on window
 	ld a, $A0
 	ldh [hTimer], a
 	ld hl, hGameState
@@ -7188,7 +7252,7 @@ GameState_12:: ; 3D97
 	and a, $F0
 	swap a
 	ld [de], a		; Print lives at the appropriate position
-	ld a, $83	; todo
+	ld a, (LCDCF_ON | LCDCF_OBJON | LCDCF_BGON); $83	; todo
 	ld [rLCDC], a	; Turn on LCD, background, objects
 	ld a, $13	; todo
 	ldh [hGameState], a
@@ -7324,7 +7388,7 @@ GameState_13:: ; 3DD7
 	ld a, l
 	cp a, $52
 	jr nz, .displayPrize
-	ld a, $83			; TODO make this a constant
+	ld a, (LCDCF_ON | LCDCF_OBJON | LCDCF_BGON); $83			; TODO make this a constant
 	ldh [rLCDC], a
 	ld a, $14
 	ldh [hGameState], a
