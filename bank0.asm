@@ -1,5 +1,5 @@
 INCLUDE "charmap.asm"
-INCLUDE "gbhw.asm"
+INCLUDE "inc/hardware.inc"
 INCLUDE "wram.asm"
 INCLUDE "hram.asm"
 INCLUDE "macros.asm"
@@ -43,10 +43,10 @@ SECTION "Interrupt Timer", ROM0[$0050]
 ; Overlaps into serial interrupt mid opcode, but it's unused anyway
 	push af
 	ld a, $03
-	ld [MBC1RomBank], a
+	ld [rROMB0], a
 	call Call_7FF0 ; TODO
 	ldh a, [hActiveRomBank]
-	ld [MBC1RomBank], a
+	ld [rROMB0], a
 	pop af
 	reti
 
@@ -208,7 +208,7 @@ AddScore:: ; 0166
 	ret
 
 Init::	; 0185
-	ld a, (1 << VBLANK) | (1 << LCD_STAT)
+	ld a, (IEF_VBLANK | IEF_STAT)
 	di
 	ldh [rIF], a
 	ldh [rIE], a
@@ -295,14 +295,14 @@ Init::	; 0185
 	ld a, $0E
 	ldh [hGameState], a	; TODO
 	ld a, 3
-	ld [MBC1RomBank], a
+	ld [rROMB0], a
 	ld [$C0A4], a
 	ld a, 0
 	ld [wWinCount], a
 	ldh [hWinCount], a
 	call InitSound
 	ld a, 2
-	ld [MBC1RomBank], a
+	ld [rROMB0], a
 	ldh [hActiveRomBank], a
 
 .jmp_226				; MAIN LOOP (well, i think)
@@ -357,7 +357,7 @@ Init::	; 0185
 	and a
 	jr nz, .jmp_293		; start the game?
 	ld a, 2
-	ld [MBC1RomBank], a
+	ld [rROMB0], a
 	ldh [hActiveRomBank], a
 	ld a, $0E
 	ldh [hGameState], a	; go back from demo to menu
@@ -764,10 +764,10 @@ GameState_0F::
 	dec a
 	ld [$DFE8], a
 	ld a, 3
-	ld [MBC1RomBank], a
+	ld [rROMB0], a
 	call InitSound
 	ldh a, [hActiveRomBank]
-	ld [MBC1RomBank], a
+	ld [rROMB0], a
 	xor a
 	ld [$DFE0], a
 	ld [$DFF0], a
@@ -816,7 +816,7 @@ GameState_11::	; 576
 	call PrepareHUD
 	ld a, $0F
 	ldh [rLYC], a	; height of the hud?
-	ld a, (1 << rTAC_ON) | rTAC_16384_HZ
+	ld a, (TACF_START | TACF_16KHZ)
 	ldh [rTAC], a
 	ld hl, rWY
 	ld [hl], $85
@@ -1045,10 +1045,10 @@ StartLevelMusic::
 	and a
 	ret nz
 	ld a, 3
-	ld [MBC1RomBank], a	; no need to save rom bank, interrupts are disabled
+	ld [rROMB0], a	; no need to save rom bank, interrupts are disabled
 	call InitSound
 	ldh a, [hActiveRomBank]
-	ld [MBC1RomBank], a
+	ld [rROMB0], a
 	ldh a, [$FFF4]		; underground?
 	and a
 	jr nz, .underground
@@ -1911,7 +1911,7 @@ GameState_06:: ; CCB
 .bonusGame
 	ld a, 2			; bonus game is stored in bank 2
 	ldh [hActiveRomBank], a
-	ld [MBC1RomBank], a
+	ld [rROMB0], a
 	ld a, $12		; bonus game state
 .changeState
 	ldh [hGameState], a
@@ -1920,7 +1920,7 @@ GameState_06:: ; CCB
 .bossLevel
 	ldh [hGameState], a
 	ld a, 3
-	ld [MBC1RomBank], a
+	ld [rROMB0], a
 	ldh [hActiveRomBank], a
 	ld hl, hLevelIndex
 	ld a, [hl]
@@ -1958,7 +1958,7 @@ GameState_08:: ; D49
 .world1Tiles
 	di
 	ld a, c
-	ld [MBC1RomBank], a
+	ld [rROMB0], a
 	ldh [hActiveRomBank], a	; todo
 	xor a
 	ldh [rLCDC], a		; turn off LCD
@@ -2008,7 +2008,7 @@ GameState_08:: ; D49
 	ld b, a
 	di
 	ld a, c
-	ld [MBC1RomBank], a
+	ld [rROMB0], a
 	ldh [hActiveRomBank], a ; todo
 	xor a
 	ldh [rLCDC], a
@@ -2176,7 +2176,7 @@ GameState_1E:: ; E5D
 	ldh [hTimer], a
 	ld a, $03
 	ldh [hActiveRomBank], a
-	ld [MBC1RomBank], a
+	ld [rROMB0], a
 	call InitSound
 	ld hl, hGameState
 	inc [hl]			; 1E → 1F
@@ -2493,7 +2493,7 @@ GameState_26:: ; 1055
 	ld [hl], $12		; go to bonus game
 	ld a, $02
 	ldh [hActiveRomBank], a
-	ld [MBC1RomBank], a
+	ld [rROMB0], a
 	ret
 
 ; Shaking, explosions, blocks disappearing
@@ -3208,7 +3208,7 @@ GameState_38::
 .resetToMenu
 	ld a, $02
 	ldh [hActiveRomBank], a
-	ld [MBC1RomBank], a
+	ld [rROMB0], a
 	ld [$C0DC], a
 	ld [$C0A4], a
 	xor a

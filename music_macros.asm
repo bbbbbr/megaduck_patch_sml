@@ -1,4 +1,4 @@
-Noise: MACRO
+MACRO Noise
 	REPT _NARG
 		IF \1 == 0
 			db 1
@@ -28,7 +28,7 @@ A_  EQU 10
 A_# EQU 11
 B_  EQU 12
 
-Notes: MACRO
+MACRO Notes
 	IF _NARG % 2 != 0
 		FAIL "Note list needs an even number of arguments"
 	ENDC
@@ -37,6 +37,6 @@ Notes: MACRO
 	ENDR
 ENDM
 
-EndSegment: MACRO
+MACRO EndSegment
 	db $00
 ENDM

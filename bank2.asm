@@ -1,5 +1,5 @@
 INCLUDE "charmap.asm"
-INCLUDE "gbhw.asm"
+INCLUDE "inc/hardware.inc"
 
 SECTION "bank 2", ROMX, BANK[2]
 LevelPointersBank2:: ; 2:4000
