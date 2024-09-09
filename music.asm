@@ -1,10 +1,16 @@
 INCLUDE "music_macros.asm"
+INCLUDE "inc/hardware.inc"
 
-SECTION "Music", ROMX[$6F98], BANK[3]
+IF DEF(TARGET_MEGADUCK)
+    SECTION "Music", ROMX[$6F98], BANK[4]  ; #MD: Moved to Bank 4
+ELSE
+    SECTION "Music", ROMX[$6F98], BANK[3]
+ENDC
+
 
 Song_6F98::
 	db $00
-	dw $6F5B
+	dw Data_6F5B ;  $6F5B
 	dw Channel1_72F3
 	dw Channel2_72F7
 	dw Channel3_72F9
@@ -12,7 +18,7 @@ Song_6F98::
 
 Song_6FA3::
 	db $00
-	dw $6F7B
+	dw Data_6F7B  ; $6F7B
 	dw Channel1_72A7
 	dw Channel2_72AB
 	dw Channel3_72AF
@@ -20,7 +26,7 @@ Song_6FA3::
 
 Song_6FAE::
 	db $00
-	dw $6F66
+	dw Data_6F66  ; $6F66
 	dw Channel1_71ED
 	dw Channel2_71F9
 	dw Channel3_7205
@@ -28,7 +34,7 @@ Song_6FAE::
 
 Song_6FB9::
 	db $00
-	dw $6F7B
+	dw Data_6F7B  ; $6F7B
 	dw Channel1_7186
 	dw Channel2_718C
 	dw $0000
@@ -36,7 +42,7 @@ Song_6FB9::
 
 Song_6FC4::
 	db $00
-	dw $6F5B
+	dw Data_6F5B  ; $6F5B
 	dw Channel1_733E
 	dw Channel2_734A
 	dw Channel3_7356
@@ -44,7 +50,7 @@ Song_6FC4::
 
 Song_6FCF::
 	db $00
-	dw $6F66
+	dw Data_6F66  ; $6F66
 	dw Channel1_74D7
 	dw Channel2_74E3
 	dw Channel3_74EF
@@ -52,7 +58,7 @@ Song_6FCF::
 
 Song_6FDA::
 	db $00
-	dw $6F66
+	dw Data_6F66  ; $6F66
 	dw Channel1_76ED
 	dw Channel2_76F7
 	dw Channel3_7701
@@ -60,7 +66,7 @@ Song_6FDA::
 
 Song_6FE5::
 	db $00
-	dw $6F7B
+	dw Data_6F7B  ; $6F7B
 	dw Channel1_6FF0
 	dw Channel2_6FFC
 	dw Channel3_7008
@@ -93,7 +99,9 @@ Segment_7024::
 	db $00
 
 Segment_7034::
-	db $9D, $3B, $6F, $A0
+	db $9D
+    dw WavePattern_6F3B  ; $3B, $6F
+    db $A0
 	db $A4
 	db $52, $4E, $4C
 	db $A9
@@ -413,7 +421,9 @@ Segment_725E::
 	db $00
 
 Segment_7272::
-	db $9D, $3B, $6F, $A0
+	db $9D
+    dw WavePattern_6F3B  ; $3B, $6F
+    db $A0
 	db $00
 
 Segment_7277::
@@ -477,7 +487,9 @@ Segment_72C5::
 	db $00
 
 Segment_72D6::
-	db $9D, $3B, $6F, $20
+	db $9D
+    dw WavePattern_6F3B  ; $3B, $6F
+    db $20
 	db $A1
 	db $58, $54, $52, $4E, $4A
 	db $A6
@@ -524,7 +536,9 @@ Segment_730F::
 	db $00
 
 Segment_7321::
-	db $9D, $1B, $6F, $21
+	db $9D
+    dw TriangeWavePattern  ; $1B, $6F
+    db $21
 	db $A8
 	db $70
 	db $A2
@@ -569,7 +583,9 @@ Segment_737A::
 	db $00
 
 Segment_738A::
-	db $9D, $3B, $6F, $20
+	db $9D
+    dw WavePattern_6F3B  ; $3B, $6F
+    db $20
 	db $A2
 	db $52, $54, $01, $58, $01, $54, $01, $52, $40, $36, $01, $30, $28, $01, $01, $01
 	db $00
@@ -813,7 +829,9 @@ Segment_7523::
 	db $00
 
 Segment_7537::
-	db $9D, $3B, $6F, $20
+	db $9D
+    dw WavePattern_6F3B  ; $3B, $6F
+    db $20
 	db $A5
 	db $01, $01
 	db $00
@@ -1204,7 +1222,9 @@ Segment_7728::
 	db $00
 
 Segment_7735::
-	db $9D, $3B, $6F, $20
+	db $9D
+    dw WavePattern_6F3B ; $3B, $6F
+    db $20
 	db $A2
 	db $70, $01, $6E, $01, $6C, $6A, $01, $01
 	db $A4
@@ -1453,7 +1473,7 @@ Segment_78C3::
 
 Song_78DC::
 	db $00
-	dw $6F72
+	dw Data_6F72  ; $6F72
 	dw Channel1_7CDC
 	dw Channel2_7CE2
 	dw $0000
@@ -1461,7 +1481,7 @@ Song_78DC::
 
 Song_78E7::
 	db $00
-	dw $6F7B
+	dw Data_6F7B  ; $6F7B
 	dw Channel1_7C7D
 	dw Channel2_7C81
 	dw Channel3_7C83
@@ -1469,7 +1489,7 @@ Song_78E7::
 
 Song_78F2::
 	db $00
-	dw $6F66
+	dw Data_6F66  ; $6F66
 	dw Channel1_7C2B
 	dw Channel2_7C31
 	dw Channel3_7C37
@@ -1477,7 +1497,7 @@ Song_78F2::
 
 Song_78FD::
 	db $00
-	dw $6F66
+	dw Data_6F66  ; $6F66
 	dw Channel1_7B32
 	dw Channel2_7B48
 	dw Channel3_7B5C
@@ -1485,7 +1505,7 @@ Song_78FD::
 
 Song_7908::
 	db $00
-	dw $6F5B
+	dw Data_6F5B  ; $6F5B
 	dw Channel1_7ACD
 	dw $0000
 	dw Channel3_7AD1
@@ -1493,7 +1513,7 @@ Song_7908::
 
 Song_7913::
 	db $00
-	dw $6F66
+	dw Data_6F66  ; $6F66
 	dw Channel1_7B03
 	dw Channel2_7B07
 	dw $0000
@@ -1501,7 +1521,7 @@ Song_7913::
 
 Song_791E::
 	db $00
-	dw $6F86
+	dw Data_6F86  ; $6F86
 	dw Channel1_7A5C
 	dw Channel2_7A66
 	dw $0000
@@ -1509,7 +1529,7 @@ Song_791E::
 
 Song_7929::
 	db $00
-	dw $6F86
+	dw Data_6F86  ; $6F86
 	dw Channel1_7A1A
 	dw Channel2_7A1E
 	dw Channel3_7A20
@@ -1517,7 +1537,7 @@ Song_7929::
 
 Song_7934::
 	db $00
-	dw $6F7B
+	dw Data_6F7B  ; $6F7B
 	dw Channel1_79E2
 	dw Channel2_79E8
 	dw $0000
@@ -1525,7 +1545,7 @@ Song_7934::
 
 Song_793F::
 	db $00
-	dw $6F7B
+	dw Data_6F7B  ; $6F7B
 	dw Channel1_794A
 	dw Channel2_7952
 	dw Channel3_795A
@@ -1564,7 +1584,9 @@ Segment_7979::
 	db $00
 
 Segment_798A::
-	db $9D, $3B, $6F, $20
+	db $9D
+    dw WavePattern_6F3B  ; $3B, $6F
+    db $20
 	db $A5
 	db $01, $28, $2A
 	db $A4
@@ -1656,7 +1678,9 @@ Segment_7A3C::
 	db $00
 
 Segment_7A4F::
-	db $9D, $3B, $6F, $21
+	db $9D
+    dw WavePattern_6F3B  ; $3B, $6F
+    db $21
 	db $A8
 	db $54, $52
 	db $A4
@@ -1736,7 +1760,9 @@ Segment_7AD3::
 	db $00
 
 Segment_7AE5::
-	db $9D, $1B, $6F, $A0
+	db $9D
+    dw TriangeWavePattern  ; $1B, $6F
+    db $A0
 	db $A2
 	db $78, $78, $78
 	db $A3
@@ -1853,7 +1879,9 @@ Segment_7BB9::
 	db $00
 
 Segment_7BC0::
-	db $9D, $1B, $6F, $20
+	db $9D
+    dw TriangeWavePattern  ; $1B, $6F
+    db $20
 	db $A3
 	db $01
 	db $A2
@@ -1896,7 +1924,9 @@ Segment_7C4F::
 	db $00
 
 Segment_7C5B::
-	db $9D, $1B, $6F, $20
+	db $9D
+    dw TriangeWavePattern  ; $1B, $6F
+    db $20
 	db $A8
 	db $44
 	db $A7
@@ -1946,7 +1976,9 @@ Segment_7C98::
 	db $00
 
 Segment_7CAD::
-	db $9D, $3B, $6F, $20
+	db $9D
+    dw WavePattern_6F3B  ; $3B, $6F
+    db $20
 	db $A2
 	db $4A, $01, $52, $4E, $01, $54, $52, $01, $58, $54, $01, $5C, $58, $01, $60, $5C, $01, $62, $60, $01, $66, $62, $01, $6A, $66, $01, $6C, $6A, $01, $70, $6C, $01, $74, $70, $01, $78, $74, $01, $7A, $78, $01, $7E
 Channel1_7CDC::
@@ -1987,7 +2019,7 @@ Segment_7D5A::
 
 Song_7D6A::
 	db $00
-	dw $6F7B
+	dw Data_6F7B  ; $6F7B
 	dw Channel1_7D75
 	dw Channel2_7D83
 	dw Channel3_7D91
@@ -2073,7 +2105,9 @@ Segment_7E14::
 	db $00
 
 Segment_7E3F::
-	db $9D, $3B, $6F, $A0
+	db $9D
+    dw WavePattern_6F3B  ; $3B, $6F
+    db $A0
 	db $00
 
 Segment_7E44::
