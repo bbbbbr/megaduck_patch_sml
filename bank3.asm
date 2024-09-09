@@ -1,7 +1,12 @@
 INCLUDE "inc/hardware.inc"
 INCLUDE "sound_constants.asm"
 
-SECTION "bank 3", ROMX, BANK[3]
+; MegaDuck note: Much of the sound driver is similar or identical to in GB Tetris
+
+DEF CH3_SOME_FLAG_BIT EQU 3  ; Audio driver may be encoding channel status into unused bit 3 in NR32
+
+SECTION "banked level data set 3", ROMX, BANK[3]
+
 LevelPointersBank3:: ; 3:4000
 	dw $503F
 	dw $5074
@@ -535,8 +540,15 @@ Jmp_4966:: ; 4966
 
 INCBIN "baserom.gb", $CA94, $4E74 - $4A94
 
-SECTION "bank 3 levels", ROMX[$503F], BANK[3]
+; TODO: MegaDuck Move into audio_driver.asm
+IF DEF(TARGET_MEGADUCK)
+    ; SECTION "banked audio", ROMX, BANK[4]  ; #MD: Made ROMX section relative instead of abs and moved to Bank 4
+    SECTION "banked audio", ROMX[$4FBC], BANK[4]  ; #MD: Made ROMX section relative instead of abs and moved to Bank 4
+ELSE
+    SECTION "banked audio", ROMX[$503F], BANK[3]
+ENDC
 
+; TODO: MegaDuck: Some of this data may need to be grouped with Bank 3 level data
 INCBIN "baserom.gb", $D03F, $6600 - $503F
 
 Data_6600:
@@ -598,13 +610,19 @@ Data_663C:
 	dw Song_7934
 	dw Song_793F	; 19
 
-_Call_7FF0:: ; 6662
+_UpdateSound__6662:: ; 6662
 	push af
 	push bc
 	push de
 	push hl
 	ld a, $03		; Cartridge doesn't have RAM, and it's not even the correct
-	ld [$00FF], a	; way to enable it. Bug
+    IF DEF(TARGET_MEGADUCK)
+        ; This may trigger unwanted MBC write for some implementations of the MegaDuck MBC
+        nop
+        nop
+    ELSE
+	   ld [$00FF], a	; way to enable it. Bug
+    ENDC
 	ei				; Is this smart
 	ldh a, [hPauseUnpauseMusic]
 	cp a, $01		; 1 means pause music
@@ -705,7 +723,7 @@ PlayWaveSFX:: ; 66F6
 	set 7, [hl]			; stops the music from using the Wave channel?
 	xor a
 	ld [$DFF4], a
-	ldh [rNR30], a		; wave DAC power
+	ldh [rNR30], a		; wave DAC power  ; #MD: OK
 	ld hl, BossCryWavePattern
 	call SetupWavePattern
 	ldh a, [rDIV]		; supposedly random, but because the music code is
@@ -733,7 +751,7 @@ PlayWaveSFX:: ; 66F6
 	ld a, [hl]
 	and a, $F8			; put a "random" number in the low nibble
 	or b
-	ld c, LOW(rNR33)	; modulate frequency
+	ld c, LOW(rNR33)	; modulate frequency  ; #MD: OK
 	ld [$FF00+c], a
 	ret
 
@@ -748,7 +766,7 @@ PlayWaveSFX:: ; 66F6
 .stopBossCry
 	xor a
 	ld [$DFF1], a
-	ldh [rNR30], a
+	ldh [rNR30], a  ; #MD: OK
 	ld hl, $DF3F
 	res 7, [hl]			; release wave channel?
 	ld bc, $DF36
@@ -766,7 +784,7 @@ TimerTickChannelData:: ; 6769
 StartTimerTickSFX:: ; 676E
 	ld a, $03
 	ld hl, TimerTickChannelData
-	jp Jmp_69C6
+	jp sfx_play__Jmp_69C6
 
 GiraChannelData:: ; 6776
 	db $3C, $80, $A0, $50, $84 ; 138.9 Hz, C#3
@@ -776,7 +794,7 @@ StartGiraSFX:: ; 677B
 	ret z
 	ld a, $0E
 	ld hl, GiraChannelData
-	jp Jmp_69C6
+	jp sfx_play__Jmp_69C6
 
 JumpChannelData:: ; 6787
 	db $00, $80, $D2, $0A, $86 ; 261.1 Hz C4
@@ -814,7 +832,7 @@ StartJumpSFX:: ; 67AF
 	ret z
 	ld a, $10
 	ld hl, JumpChannelData
-	call Jmp_69C6
+	call sfx_play__Jmp_69C6
 	ld hl, $DFE4
 	ld [hl], $0A
 	inc l
@@ -832,14 +850,14 @@ ContinueJumpSFX:: ; 67C4
 	push hl
 	ld hl, $000F		; some sort of sweep implementation
 	add hl, de
-	ld c, LOW(rNR13)
+	ld c, LOW(rNR13)  ; #MD: OK
 	ld a, l
 	ld [$FF00+c], a
 	ld b, a
-	inc c
+	inc c               ; increment to NR14  ; #MD: OK
 	ld a, h
 	and a, $3F
-	ld [$FF00+c], a		; rNR14
+	ld [$FF00+c], a		; rNR14  ; #MD: OK
 	pop hl
 	ldd [hl], a
 	ld [hl], b
@@ -850,7 +868,7 @@ StartSuperballSFX:: ; 67E4
 	ret z
 	ld a, $03
 	ld hl, SuperballChannelData
-	jp Jmp_69C6
+	jp sfx_play__Jmp_69C6
 
 ContinueSquareSFX:
 	call updateSoundProgress
@@ -859,15 +877,18 @@ ContinueSquareSFX:
 .stop
 	xor a
 	ld [$DFE1], a
-	ldh [rNR10], a
-IF DEF(TARGET_MEGADUCK)
-    ld a, $80 ; Nybble swap
-ELSE
-	ld a, $08
-ENDC
-	ldh [rNR12], a
+	ldh [rNR10], a  ; #MD: OK
+
+    IF DEF(TARGET_MEGADUCK)
+        ld a, $80 ; MegaDuck NR12 Nybble swap
+    ELSE
+    	ld a, $08
+    ENDC
+	ldh [rNR12], a  ; #MD: OK
+
 	ld a, $80
-	ldh [rNR14], a
+	ldh [rNR14], a  ; #MD: OK
+
 	ld hl, $DF1F
 	res 7, [hl]				; unlock
 	ret
@@ -881,7 +902,7 @@ StartCoinSFX:: ; 6813
 	call Call_6791
 	ret z
 	ld hl, CoinChannelData1
-	jp Jmp_69C6
+	jp sfx_play__Jmp_69C6
 
 ContinueCoinSFX:: ; 681D
 	ld hl, $DFE4
@@ -908,7 +929,7 @@ StartStompSFX:: ; 683D
 	ret z
 	ld a, $08
 	ld hl, StompChannelData1
-	jp Jmp_69C6
+	jp sfx_play__Jmp_69C6
 
 ContinueStompSFX:: ; 6849
 	call updateSoundProgress
@@ -935,7 +956,7 @@ StartFlowerSFX:: ; 6868
 	ld [$DFE6], a
 	ld a, $05
 	ld hl, FlowerChannelData
-	jp Jmp_69C6
+	jp sfx_play__Jmp_69C6
 
 GrowChannelData:
 	db $27, $80, $8A, $10, $86 ; 264.3 Hz ~ C4 (17 cents off though)
@@ -945,7 +966,7 @@ StartGrowSFX:: ; 687A
 	ld [$DFE6], a
 	ld a, $05
 	ld hl, GrowChannelData
-	jp Jmp_69C6
+	jp sfx_play__Jmp_69C6
 
 ContinueSweepSquareSFX::
 	call updateSoundProgress
@@ -957,11 +978,11 @@ ContinueSweepSquareSFX::
 	ld [hl], a
 	cp a, $E0
 	jp z, ContinueSquareSFX.stop
-	ld c, LOW(rNR13)
+	ld c, LOW(rNR13)  ; #MD: OK
 	ld [$FF00+c], a
-	inc c
+	inc c                   ; Increment to NR14  ; #MD: OK
 	ld a, $86
-	ld [$FF00+c], a			; rNR14
+	ld [$FF00+c], a			; rNR14  ; #MD: OK
 	ret
 
 BumpChannelData:: ; 
@@ -972,7 +993,7 @@ StartBumpSFX:: ; 68A5
 	ret z
 	ld a, $08
 	ld hl, BumpChannelData
-	jp Jmp_69C6
+	jp sfx_play__Jmp_69C6
 
 InjuryChannelData::
 	db $3A, $80, $E3, $20, $86 ; 273.1 Hz (one octave above the bump thing?)
@@ -985,7 +1006,7 @@ StartInjurySFX::
 	ret z
 	ld a, $06
 	ld hl, InjuryChannelData
-	jp Jmp_69C6
+	jp sfx_play__Jmp_69C6
 
 ContinueInjurySFX::
 	call updateSoundProgress
@@ -1000,18 +1021,29 @@ ContinueInjurySFX::
 	ld a, [hl]
 	and a
 	jp z, ContinueSquareSFX.stop
-	ld c, LOW(rNR12)  ; TODO: MegaDuck: May need a nybble swap here
-	ld [$FF00+c], a
-	inc c
+
+	ld c, LOW(rNR12)  ; #MD: OK
+    IF DEF(TARGET_MEGADUCK)
+        ; MegaDuck NR12 Nybble Swap
+        swap a
+    ENDC
+	ld [$FF00+c], a     ; NR12  ; #MD: OK
+
+    IF DEF(TARGET_MEGADUCK)
+        ; MegaDuck NR12 -> 14 Compensate for reordered register addresses
+        inc c
+    ENDC
+	inc c               ; Increment to NR14  ; #MD: OK
 	inc c
 	ld a, $87			; 609.6 Hz? Trigger
-	ld [$FF00+c], a		; rNR14
+	ld [$FF00+c], a		; rNR14  ; #MD: OK
+
 	ret
 
 StartOneUpSFX::
 	ld a, $06
 	ld hl, OneUpNote1
-	jp Jmp_69C6
+	jp sfx_play__Jmp_69C6
 
 ; Pentatonic riff. CDEGC'A in C major
 OneUpNote1::
@@ -1073,7 +1105,7 @@ ExplosionChannelData:: ; 6953
 StartExplosionSFX:: ; 6957
 	ld a, $30
 	ld hl, ExplosionChannelData
-	jp Jmp_69C6
+	jp sfx_play__Jmp_69C6
 
 Call_695F:: ; 695F
 	ld a, [$DFF9]
@@ -1095,7 +1127,7 @@ StartDeathCrySFX:: ; 6970
 	ret z
 	ld a, $06
 	ld hl, DeathCryChannelData
-	jp Jmp_69C6
+	jp sfx_play__Jmp_69C6
 
 ContinueDeathCrySFX:: ; 697C
 	call updateSoundProgress
@@ -1110,7 +1142,11 @@ ContinueDeathCrySFX:: ; 697C
 	ld a, [hl]
 	and a
 	jr z, ContinueNoiseSFX.stop
-	ldh [rNR43], a		; noise characteristics  ; TODO: MegaDuck: May need a nybble swap here
+    IF DEF(TARGET_MEGADUCK)
+        ; MegaDuck NR43 nybble swap
+        swap a
+    ENDC
+	ldh [rNR43], a		; noise characteristics  ; #MD: OK
 	ret
 
 FireBreathChannelData:: ; 6993
@@ -1119,7 +1155,7 @@ FireBreathChannelData:: ; 6993
 StartFireBreathSFX:: ; 6997
 	ld a, $16
 	ld hl, FireBreathChannelData
-	jp Jmp_69C6
+	jp sfx_play__Jmp_69C6
 
 BlockShatterChannelData:: ; 699F
 	db $00, $F2, $55, $80
@@ -1129,7 +1165,7 @@ StartBrickShatterSFX:: ; 69A3
 	ret z
 	ld a, $15
 	ld hl, BlockShatterChannelData
-	jp Jmp_69C6
+	jp sfx_play__Jmp_69C6
 
 ContinueNoiseSFX:: ; 69AF
 	call updateSoundProgress
@@ -1138,21 +1174,24 @@ ContinueNoiseSFX:: ; 69AF
 .stop
 	xor a
 	ld [$DFF9], a
-IF DEF(TARGET_MEGADUCK)
-    ld a, $80
-ELSE
-	ld a, $08
-ENDC
-	ldh [rNR42], a		; mute noise channel, setup envelope?
+
+    IF DEF(TARGET_MEGADUCK)
+        ; MegaDuck NR42 nybble swap
+        ld a, $80
+    ELSE
+    	ld a, $08
+    ENDC
+	ldh [rNR42], a		; mute noise channel, setup envelope?  ; #MD: OK
+
 	ld a, $80
-	ldh [rNR44], a		; trigger noise, consecutive mode
+	ldh [rNR44], a		; trigger noise, consecutive mode  ; #MD: OK
 	ld hl, $DF4F		; noise?
 	res 7, [hl]
 	ret
 
 ; write SFX data to the channels (from where?)
 ; DE starts at DFxx + 2 (DFE2, DFFA, like that)
-Jmp_69C6:: ; 69C6
+sfx_play__Jmp_69C6:: ; 69C6
 	push af
 	dec e			; using DFE- as example, but it holds for other engines as well
 	ldh a, [$FFD1]
@@ -1179,37 +1218,140 @@ Jmp_69C6:: ; 69C6
 	ret
 
 ; copy HL to channel registers
+
+; #MD Handles register address order changes for all channels
+;     which breaks expectation of writes in sequential order.
+;     Solve it by using direct writes to registers instead
 SetupChannel:: ; 69E5
-.square1
-	push bc
-	ld c, LOW(rNR10)
-	ld b, $05
-	jr .loopCopy
+IF DEF(TARGET_MEGADUCK)
+    .square1:
+        ; #MD Writes NR10 -> NR14 (5)
+        ld   a, [hl+]
+        ldh  [rNR10], a
 
-.square2
-	push bc
-	ld c, LOW(rNR21)
-	ld b, $04
-	jr .loopCopy
+        ld   a, [hl+]
+        ldh  [rNR11], a
 
-.wave
-	push bc
-	ld c, LOW(rNR30)
-	ld b, $05
-	jr .loopCopy
+        ; #MD NR12 needs nybble swap
+        ld   a, [hl+]
+        swap a
+        ldh  [rNR12], a
 
-.noise
-	push bc
-	ld c, LOW(rNR41)
-	ld b, $04
-.loopCopy				; copy B bytes from HL to the channel in C
-	ldi a, [hl]
-	ld [$FF00+c], a
-	inc c
-	dec b
-	jr nz, .loopCopy
-	pop bc
-	ret
+        ld   a, [hl+]
+        ldh  [rNR13], a
+
+        ld   a, [hl+]
+        ldh  [rNR14], a
+        ret
+
+    .square2
+        ; #MD Writes NR21 -> NR24 (4)
+        ld   a, [hl+]
+        ldh  [rNR21], a
+
+        ; #MD NR22 needs nybble swap
+        ld   a, [hl+]
+        swap a
+        ldh  [rNR22], a
+
+        ld   a, [hl+]
+        ldh  [rNR23], a
+
+        ld   a, [hl+]
+        ldh  [rNR24], a
+        ret
+
+    ; #MD: This block might never get called? Could just be a RET?
+    .wave
+        ; #MD Writes NR30_REG -> NR34 (5)
+        ld   a, [hl+]
+        ldh  [rNR30], a
+
+        ld   a, [hl+]
+        ldh  [rNR31], a
+
+        ; Audio driver may be encoding channel status into unused bit 3 in NR32
+        bit  CH3_SOME_FLAG_BIT, a
+        jr nz, .NR32_bit_preserve
+            ; #MD NR32: Translate volume. New Volume = ((0x00 - Volume) & 0x60)
+            ; GB: Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
+            ; MD: Bits:6..5 : 00 = mute, 11 = 100%, 10 = 50%, 01 = 25%
+            ld   a, [hl+]
+            cpl
+            add $20 ; start bit rollover at bit 5 to ignore possible values in lower bits (vs add 1)
+            jr .NR32_bit_handle_done
+
+        .NR32_bit_preserve
+            and $60            ; #MD NR32: Translate volume. New Volume = ((0x00 - Volume) & 0x60)
+            ; GB: Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
+            ; MD: Bits:6..5 : 00 = mute, 11 = 100%, 10 = 50%, 01 = 25%
+            ld   a, [hl+]
+            cpl
+            add $20 ; start bit rollover at bit 5 to ignore possible values in lower bits (vs add 1)
+            and $60
+            set   CH3_SOME_FLAG_BIT, a  ; restore flag since it was set earlier
+
+        .NR32_bit_handle_done
+
+        ldh  [rNR32], a
+
+        ld   a, [hl+]
+        ldh  [rNR33], a
+
+        ld   a, [hl+]
+        ldh  [rNR34], a
+        ret
+
+    .noise:
+        ; #MD Writes NR41 -> NR44 (4)
+        ld   a, [hl+]
+        ldh  [rNR41], a
+
+        ; #MD NR42 needs nybble swap
+        ld   a, [hl+]
+        swap a
+        ldh  [rNR42], a
+
+        ; #MD NR43 needs nybble swap
+        ld   a, [hl+]
+        swap a
+        ldh  [rNR43], a
+
+        ld   a, [hl+]
+        ldh  [rNR44], a
+        ret
+    ELSE
+    .square1
+    	push bc
+    	ld c, LOW(rNR10)  ; #MD: OK
+    	ld b, $05
+    	jr .loopCopy
+
+    .square2
+    	push bc
+    	ld c, LOW(rNR21)  ; #MD: OK
+    	ld b, $04
+    	jr .loopCopy
+
+    .wave
+    	push bc
+    	ld c, LOW(rNR30)  ; #MD: OK
+    	ld b, $05
+    	jr .loopCopy
+
+    .noise
+    	push bc
+    	ld c, LOW(rNR41)  ; #MD: OK
+    	ld b, $04
+    .loopCopy				; copy B bytes from HL to the channel in C
+    	ldi a, [hl]
+    	ld [$FF00+c], a
+    	inc c
+    	dec b
+    	jr nz, .loopCopy
+    	pop bc
+ENDC
+    	ret
 
 ; do a lookup in HL
 LookupSoundPointer:: ; 6A07
@@ -1271,24 +1413,25 @@ _InitSound:: ; 6A33
 	ld [$DF4F], a
 	ldh [hPauseUnpauseMusic], a
 	ldh [$FFDE], a
-	ld a, $FF
+	ld a, AUDTERM_ALL_ON ; $FF
 	ldh [rNR51], a	; enable all channels to both outputs
 .muteChannels
-IF DEF(TARGET_MEGADUCK)
-    ld a, $80
-ELSE
-	ld a, $08
-ENDC
-	ldh [rNR12], a
-	ldh [rNR22], a
-	ldh [rNR42], a	; volume to zero, enable envelope?
+    IF DEF(TARGET_MEGADUCK)
+        ; MegaDuck NR12/22/42 Nybble swap
+        ld a, $80
+    ELSE
+    	ld a, $08
+    ENDC
+	ldh [rNR12], a  ; #MD: OK
+	ldh [rNR22], a  ; #MD: OK
+	ldh [rNR42], a	; volume to zero, enable envelope?  ; #MD: OK
 	ld a, $80
-	ldh [rNR14], a
-	ldh [rNR24], a
-	ldh [rNR44], a	; restart sound, counter mode
+	ldh [rNR14], a  ; #MD: OK
+	ldh [rNR24], a  ; #MD: OK
+	ldh [rNR44], a	; restart sound, counter mode  ; #MD: OK
 	xor a
-	ldh [rNR10], a	; disable sweep
-	ldh [rNR30], a	; disable wave
+	ldh [rNR10], a	; disable sweep  ; #MD: OK
+	ldh [rNR30], a	; disable wave  ; #MD: OK
 	ret
 
 PlaySquareSFX:: ; 6A6A
@@ -1381,7 +1524,7 @@ StartMusic:: ; 6AB5
 	ldh [hPanInterval], a
 	ldi a, [hl]
 	ldh [hChannelEnableMask1], a
-	ldh [rNR51], a
+    ldh [rNR51], a  ; #MD: OK
 	ldi a, [hl]
 	ldh [hChannelEnableMask2], a
 	xor a
@@ -1426,7 +1569,7 @@ PanStereo:: ; 6B09
 	jr z, .applyChannelEnableMasks
 	ldh a, [hChannelEnableMask2]
 .applyChannelEnableMasks
-	ldh [rNR51], a
+    ldh [rNR51], a  ; #MD: OK
 	ret
 
 ; Four bytes:
@@ -1530,7 +1673,7 @@ Call_6B8C::; 6B8C
 Jmp_6BF4: ; 6BF4
 	push hl
 	xor a
-	ldh [rNR30], a		; disable wave channel
+	ldh [rNR30], a		; disable wave channel  ; #MD: OK
 	ld l, e
 	ld h, d
 	call SetupWavePattern
@@ -1549,7 +1692,7 @@ Jmp_6C00: ; 6C00
 	ld c, a
 	inc l
 	inc l
-	ld [hl], e					; DFx6- will go into NRx2 ; TODO : ?? MegaDuck nybble swap and more
+	ld [hl], e					; DFx6- will go into NRx2 ; ?? #MD: TODO: MegaDuck nybble swap and more? (Huh, noticed that I missed this in Tetris...)
 	inc l
 	ld [hl], d					; DFx7 - always 0 or 6F
 	inc l
@@ -1618,8 +1761,17 @@ Jmp_6C4C:
 	ld a, [hl]			; DF32?
 	cp a, $06
 	jr nz, .jmp_6C65
+    ; 50% volume
+    ; #MD NR32 OK
+    ;
+    ; Translate NR32 volume. New Volume = ((0x00 - Volume) & 0x60)
+    ; GB: Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
+    ; MD: Bits:6..5 : 00 = mute, 11 = 100%, 10 = 50%, 01 = 25%
+    ;
+    ; Fixed for GB and MD by using constant managed by hardware.inc
+    ; instead of hard wired $40 (plus, 50% / Medium is the same for both)
 	ld a, AUDVOL_CH3_MED ; $40
-	ldh [rNR32], a		; wave channel volume
+	ldh [rNR32], a		; wave channel volume    ; #MD: OK
 .jmp_6C65
 	push hl
 	ld a, l
@@ -1678,8 +1830,8 @@ Jmp_6C4C:
 .stopSong
 	ld hl, $DFE9
 	ld [hl], $00
-	ld a, $FF
-	ldh [rNR51], a
+	ld a, AUDTERM_ALL_ON ; $FF
+	ldh [rNR51], a  ; #MD: OK
 	call _InitSound.muteChannels
 	ret
 
@@ -1775,7 +1927,7 @@ PlayMusic:: ; 6CBE
 	ld a, e
 	cp a, $4B
 	jr nz, .loop
-	ld c, LOW(rNR41)
+	ld c, LOW(rNR41)  ; #MD: OK
 	ld hl, $DF44
 	jr .jmp_6D78
 
@@ -1786,16 +1938,16 @@ PlayMusic:: ; 6CBE
 	jr z, .jmp_6D73
 	cp a, 2					; Square 2
 	jr z, .jmp_6D6F
-	ld c, LOW(rNR30)		; Wave
+	ld c, LOW(rNR30)		; Wave  ; #MD: OK
 	ld a, [$DF3F]			; Lock
 	bit 7, a
 	jr nz, .jmp_6D64
 	xor a
-	ld [$FF00+c], a
+	ld [$FF00+c], a  ; NR30 : #MD: OK
 	ld a, $80
-	ld [$FF00+c], a
+	ld [$FF00+c], a  ; NR30 : #MD: OK
 .jmp_6D64
-	inc c
+	inc c  ; Now expecting to point to NR31 : #MD: OK
 	inc l
 	inc l
 	inc l
@@ -1806,27 +1958,41 @@ PlayMusic:: ; 6CBE
 	jr .jmp_6D84
 
 .jmp_6D6F
-	ld c, LOW(rNR21)
+	ld c, LOW(rNR21)  ; #MD: OK
 	jr .jmp_6D78
 
 .jmp_6D73
-	ld c, LOW(rNR10)
-	ld a, $00
-	inc c
-.jmp_6D78
+    IF DEF(TARGET_MEGADUCK)
+    ; Handle changed register address order
+        ld   c, LOW(rNR11)  ; #MD: OK
+        ld   a, $00
+    ELSE
+        ; For GB why not just load LOW(rNR11) directly instead of by -1 then inc c? Result is not tested...
+        ld c, LOW(rNR10)  ; #MD: OK
+        ld a, $00
+        inc c
+    ENDC
+
+.jmp_6D78                   ; Entering from: jmp_6D6F and jmp_6D34, will have C expecting to point to NR21 and NR41 with LDH : #MD: OK
 	inc l
 	inc l
 	inc l
 	ldd a, [hl]				; DFx7
 	and a
-	jr nz, .jmp_6DCE
+    ; #MD Due to code changes jump exceeds jr limit, so need a jp
+    IF DEF(TARGET_MEGADUCK)
+        jp   nz, .jmp_6DCE  ; .hasWavRam
+    ELSE
+        jr   nz, .jmp_6DCE  ; .hasWavRam
+    ENDC
 	ldi a, [hl]				; DFx6
 	ld e, a
+
 .jmp_6D81
 	inc l
 	ldi a, [hl]				; DFx8
 	ld d, a
-.jmp_6D84
+.jmp_6D84                   ; Entering from: jmp_6D64 will have C expecting to point to NR31 with LDH : #MD: OK
 	push hl
 	inc l
 	inc l
@@ -1838,27 +2004,139 @@ PlayMusic:: ; 6CBE
 	inc l
 	inc l
 	ld [hl], $00			; DFxE
+
 	inc l
 	ld a, [hl]				; DFxF lock
+
 	pop hl
 	bit 7, a
 	jr nz, .resetNoteTimer	; don't update the channel registers when locked
+
+    ; #MD D in 1st (len), E in 2nd (env), then [HL], [HL+1] | $80
+    ;
+    ; CH1 comes from equiv to .startWritingToSq1
+    ; CH2 comes from equiv to.startWritingToSq2
+    ; CH3 comes from equiv to.getNonNoiseDataToWrite -> equiv to.contWave
+    ; CH4 comes from equiv to.noiseLoop
+    ;
+    ; Writes sequence of NRx1(d),NRx2(e),NRx3([hl+]),NRx4([hl] | $80)
+    ;
+    ; #MD Handles register address order changes for all channels
+    ;     which breaks expectation of writes in sequential order.
+    ;     Solve it by using direct writes to registers instead
+    ;
+    ; D in 1st (len)
+    ; #MD: NR11 / NR21 / NR31 / NR41 OK
+
 	ld a, d
 	ld [$FF00+c], a			; NRx1
-	inc c
-	ld a, e
-	ld [$FF00+c], a			; NRx2 ; TODO : MegaDuck nybble swap and more
-	inc c
-	ldi a, [hl]				; DFx9 freq lo
-	ld [$FF00+c], a			; NRx3
-	inc c
+
+    IF DEF(TARGET_MEGADUCK)
+                                                                        ; Formerly 6d21-6d2d
+        ; Select channel to load based on address lower byte in C (NRx1)
+
+            ; Bit 6 only set on rNR41 addr lower byte (0xFF40) for MegaDuck
+            bit 6, c
+            jr nz, .megaduck_load_nr42_to_nr43
+
+            ; Bit 3 only set on rNR31 addr lower byte (0xFF2B) for MegaDuck
+            bit 3, c
+            jr nz, .megaduck_load_nr32_to_nr33
+
+            ; Bit 0 only set on rNR21 addr lower byte (0xFF25) for MegaDuck
+            bit 0, c
+            jr nz, .megaduck_load_nr22_to_nr23
+
+            ; Otherwise drop through to rNR11 (0xFF22)
+
+            .megaduck_load_nr12_to_nr13:
+            ; #MD NR12 needs nybble swap
+            ld   a, e
+            swap a
+            ldh  [rNR12], a
+
+            ld   a, [hl+]
+            ldh  [rNR13], a
+
+            ; Prep next write
+            ld   c, LOW(rNR14)
+            jp .megaduck_load_nrx2_to_nrx3_done
+
+        .megaduck_load_nr22_to_nr23:
+            ; #MD NR22 needs nybble swap
+            ld   a, e
+            swap a
+            ldh  [rNR22], a
+
+            ld   a, [hl+]
+            ldh  [rNR23], a
+
+            ; Prep next write
+            ld   c, LOW(rNR24)
+            jp .megaduck_load_nrx2_to_nrx3_done
+
+        .megaduck_load_nr32_to_nr33:
+            ; #MD NR32: Translate volume. New Volume = ((0x00 - Volume) & 0x60)
+            ; GB: Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
+            ; MD: Bits:6..5 : 00 = mute, 11 = 100%, 10 = 50%, 01 = 25%
+            ld   a, e
+            cpl
+            add $20 ; start bit rollover at bit 5 to ignore possible values in lower bits (vs add 1)
+            and $60
+
+            ; Audio driver may be encoding channel status into unused bit 3 in NR32
+            bit  CH3_SOME_FLAG_BIT, e
+            jr z, .NR32_bit_handle_done
+                set  CH3_SOME_FLAG_BIT, a
+            .NR32_bit_handle_done
+
+            ldh  [rNR32], a
+
+            ld   a, [hl+]
+            ldh  [rNR33], a
+
+            ; Prep next write
+            ld   c, LOW(rNR34)
+            jp .megaduck_load_nrx2_to_nrx3_done
+
+        .megaduck_load_nr42_to_nr43:
+            ; #MD NR42 needs nybble swap
+            ld   a, e
+            swap a
+            ldh  [rNR42], a
+
+            ; #MD NR43 needs nybble swap
+            ld   a, [hl+]
+            swap a
+            ldh  [rNR43], a
+
+            ; Prep next write
+            ld   c, LOW(rNR44)
+
+        .megaduck_load_nrx2_to_nrx3_done:
+        ; C now has corrected MegaDuck NRx4 address low byte
+    ELSE
+    	inc c
+    	ld a, e
+    	ld [$FF00+c], a			; NRx2  ; #MD: OK
+
+    	inc c
+    	ldi a, [hl]				; DFx9 freq lo
+    	ld [$FF00+c], a			; NRx3  ; #MD: OK
+
+    	inc c
+    ENDC
+
+    ; #MD: NR14,NR24,NR34,NR44 OK (due to direct address preload with constants above)
 	ld a, [hl]				; DFxA freq hi
 	or a, $80				; trigger
 	ld [$FF00+c], a			; NRx4
+
 	ld a, l
 	or a, $05				; euhm
 	ld l, a
 	res 0, [hl]				; DFxF lock? lowest bit
+
 .resetNoteTimer
 	pop hl
 	dec l
@@ -1869,14 +2147,15 @@ PlayMusic:: ; 6CBE
 	ld de, hCurrentChannel
 	ld a, [de]
 	cp a, 4
-	jr z, .jmp_6DC1			; done after 4 channels
+	jr z, .jmp_done_6DC1			; done after 4 channels
+
 	inc a
 	ld [de], a
 	ld de, $0010
 	add hl, de
 	jp .jmp_6CCB
 
-.jmp_6DC1
+.jmp_done_6DC1
 	ld hl, $DF1E
 	inc [hl]
 	ld hl, $DF2E
@@ -1888,7 +2167,12 @@ PlayMusic:: ; 6CBE
 .jmp_6DCE
 	ld b, $00
 	inc l
-	jr .jmp_6D81
+    ; #MD Due to code changes jump exceeds jr limit, so need a jp
+    IF DEF(TARGET_MEGADUCK)
+        jp   .jmp_6D81  ; .after_hasWavRam
+    ELSE
+        jr   .jmp_6D81  ; .after_hasWavRam
+    ENDC
 
 .call_6DD3
 	ld a, b
@@ -1906,19 +2190,19 @@ PlayMusic:: ; 6CBE
 	ld l, a
 	ld a, [hl]				; DFx8
 	and a, $0F
-	jr z, .jmp_6DFC
+	jr z, .jmp_done_6DFC
 	ldh [$FFD1], a
 	ldh a, [hCurrentChannel]
-	ld c, LOW(rNR13)
+	ld c, LOW(rNR13)  ; #MD: OK
 	cp a, $01				; square 1
 	jr z, .jmp_6DFE
-	ld c, LOW(rNR23)
+	ld c, LOW(rNR23)  ; #MD: OK
 	cp a, $02				; square 2
 	jr z, .jmp_6DFE
-	ld c, LOW(rNR33)
+	ld c, LOW(rNR33)  ; #MD: OK
 	cp a, $03				; wave
 	jr z, .jmp_6DFE
-.jmp_6DFC
+.jmp_done_6DFC
 	pop hl
 	ret
 
@@ -1964,15 +2248,28 @@ PlayMusic:: ; 6CBE
 	ld h, $00
 .jmp_6E33
 	ld l, a
+
 .jmp_6E34
 	pop de
 	add hl, de
 	ld a, l
 	ld [$FF00+c], a		; freq lo
+
+    ; #MD NR14,NR24,NR34 OK
+    IF DEF(TARGET_MEGADUCK)
+        ; #MD Fix address scrambling for CH3 (NR33->NR34), CH1 & CH2 OK
+        ; Bit 2 only set on rNR33 addr lower byte (0xFF2E) for MegaDuck. Not set for NR13 (0xFF23) and NR23 (0xFF28)
+        bit 2, c
+        jr z, .megaduck_nr14_nr24_skip_nr34_addr_fix
+            ; Fix c for NR34 (0xFF2D) so next inc will get it to the right NR34 address for MD
+            dec c
+            dec c
+        .megaduck_nr14_nr24_skip_nr34_addr_fix:
+    ENDC
 	inc c
 	ld a, h
 	ld [$FF00+c], a		; freq hi
-	jr .jmp_6DFC
+	jr .jmp_done_6DFC
 
 Data_6E3D:: ; 6E3D
 	db $00, $00, $00, $00, $00
@@ -2112,10 +2409,14 @@ Data_6F8F:: ; 6F8F
 	db 4, 8, 16, 32, 64, 128
 	db       24, 48, 96
 
-SECTION "TODO name", ROMX[$7FF0], BANK[3]
+IF DEF(TARGET_MEGADUCK)
+    SECTION "Banked Sound Wrappers", ROMX, BANK[4]  ; #MD: Made ROMX section relative instead of abs and moved to Bank 4
+ELSE
+    SECTION "Banked Sound Wrappers", ROMX[$7FF0], BANK[3]
+ENDC
 ; gets called from timer interrupt
-Call_7FF0:: ; 7FF0
-	jp _Call_7FF0
+UpdateSoundWrapper__7FF0:: ; 7FF0
+    jp _UpdateSound__6662
 
 InitSound:: ; 7FF3
 	jp _InitSound

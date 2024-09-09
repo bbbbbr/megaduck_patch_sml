@@ -43,9 +43,9 @@ SECTION "Interrupt Timer", ROM0[$0050]
 ; Switch to bank 3 (XXX contains music code?)
 ; Overlaps into serial interrupt mid opcode, but it's unused anyway
 	push af
-	ld a, $03
+	ld a, BANK("banked audio")  ; $03
 	ld [rROMB0], a
-	call Call_7FF0 ; TODO
+	call UpdateSoundWrapper__7FF0
 	ldh a, [hActiveRomBank]
 	ld [rROMB0], a
 	pop af
@@ -232,12 +232,21 @@ Init::	; 0185
 	ldh [rOBP0], a
 	ld a, $54
 	ldh [rOBP1], a
-	ld hl, rNR52
-	ld a, AUDENA_ON ; $80
-	ldd [hl], a		; Turn the sound on
-	ld a, $FF
-	ldd [hl], a		; Output all sounds to both terminals
-	ld [hl], $77	; Turn the volume up to the max
+    IF DEF(TARGET_MEGADUCK)
+       ; MegaDuck: compensate for NR52 -> NR51 -> NR50 address order change (reorder to Duck sequential)
+        ld hl, rNR51    ; #MD: OK
+        ld a, AUDTERM_ALL_ON ; $FF
+        ldd [hl], a     ; NR51 Output all sounds to both terminals  ; #MD: OK  ; $01B4
+        ld a, AUDENA_ON ; $80
+        ldd [hl], a     ; NR52 Turn the sound on  ; #MD: OK  ; #MD: OK  ; $01B7
+    ELSE
+    	ld hl, rNR52    ; #MD: OK
+    	ld a, AUDENA_ON ; $80
+        ldd [hl], a		; NR52 Turn the sound on  ; #MD: OK  ; $01B4
+    	ld a, AUDTERM_ALL_ON ; $FF
+    	ldd [hl], a		; NR51 Output all sounds to both terminals  ; #MD: OK  ; $01B7
+    ENDC
+	ld [hl], (AUDVOL_LEFT_MAX | AUDVOL_RIGHT_MAX) ; $77	; NR50 Turn the volume up to the max        ; #MD: OK  ; $01B8
 	ld sp, $CFFF
 
 	xor a
@@ -267,7 +276,7 @@ Init::	; 0185
 .clearOAMloop
 	ldd [hl], a
 	dec b
-IF DEF(TARGET_MEGADUCK)  ; FIXME : MegaDuck (due to an emulator patching memory corruption issue at the moment)
+IF DEF(MEGADUCK_SAMEDUCK_TEMP_FIX)  ; FIXME : MegaDuck (due to an emulator patching memory corruption issue at the moment)
     nop
     nop
 ELSE
@@ -300,7 +309,7 @@ ENDC
 	ld [$C0DC], a
 	ld a, $0E
 	ldh [hGameState], a	; TODO
-	ld a, 3
+	ld a, BANK("banked audio")  ; 3
 	ld [rROMB0], a
 	ld [$C0A4], a
 	ld a, 0
@@ -320,7 +329,7 @@ ENDC
 	call KillMario
 	call Call_1736
 .timeNotUp
-	SAVE_AND_SWITCH_ROM_BANK 3
+	SAVE_AND_SWITCH_ROM_BANK BANK("banked level data set 3")  ;  3
 	call ReadJoypad
 	RESTORE_ROM_BANK
 	ldh a, [$FF9F]	; Demo mode?
@@ -769,9 +778,9 @@ GameState_0F::
 	ld [$C0A4], a
 	dec a
 	ld [$DFE8], a
-	ld a, 3
+	ld a, BANK("banked audio")  ; 3
 	ld [rROMB0], a
-	call InitSound
+    call InitSound
 	ldh a, [hActiveRomBank]
 	ld [rROMB0], a
 	xor a
@@ -918,7 +927,8 @@ GameState_00::	; 627
     call Call_84E
     ldh  a, [hActiveRomBank]    ; hActiveRomBank = $FFFD
     ldh  [hSavedRomBank], a ; hSavedRomBank = $FFE1
-    ld   a, $03
+
+    ld   a, BANK("banked level data set 3")  ; $03
     ldh  [hActiveRomBank], a    ; hActiveRomBank = $FFFD
     ld   [rROMB0], a
     call Call_4823.jmp_48FC
@@ -1108,9 +1118,9 @@ StartLevelMusic::
 	ld a, [wInvincibilityTimer]
 	and a
 	ret nz
-	ld a, 3
+	ld a, BANK("banked audio")  ; 3
 	ld [rROMB0], a	; no need to save rom bank, interrupts are disabled
-	call InitSound
+    call InitSound
 	ldh a, [hActiveRomBank]
 	ld [rROMB0], a
 	ldh a, [$FFF4]		; underground?
@@ -1983,7 +1993,7 @@ GameState_06:: ; CCB
 
 .bossLevel
 	ldh [hGameState], a
-	ld a, 3
+	ld a, BANK("banked level data set 3")  ; 3
 	ld [rROMB0], a
 	ldh [hActiveRomBank], a
 	ld hl, hLevelIndex
@@ -2022,7 +2032,7 @@ GameState_08:: ; D49
 .world1Tiles
 	di
 	ld a, c
-	ld [rROMB0], a
+	ld [rROMB0], a     ; TODO: #MD: Banking - Bank loaded from C, where does that get set, does it need patching?
 	ldh [hActiveRomBank], a	; todo
 	xor a
 	ldh [rLCDC], a		; turn off LCD
@@ -2064,8 +2074,8 @@ GameState_08:: ; D49
 	cp a, 2
 	ld c, 1				; world 2 tiles are in rom bank 1
 	jr z, .jmp_D85
-	cp a, 3				; world 3 tiles are in rom bank 3
-	ld c, 3
+	cp a, BANK("banked level data set 3")  ; 3				; world 3 tiles are in rom bank 3
+	ld c, BANK("banked level data set 3")  ; 3
 	jr z, .jmp_D85
 	ld c, 1				; world 4 tiles are in rom bank 1
 .jmp_D85
@@ -2238,10 +2248,10 @@ GameState_1E:: ; E5D
 .gateIsOpen
 	ld a, $10
 	ldh [hTimer], a
-	ld a, $03
+	ld a, BANK("banked audio")  ; $03
 	ldh [hActiveRomBank], a
 	ld [rROMB0], a
-	call InitSound
+    call InitSound
 	ld hl, hGameState
 	inc [hl]			; 1E → 1F
 	ret
@@ -3504,7 +3514,7 @@ Call_1736::
 	ldh [$FF8D], a
 	ld a, $05
 	ldh [$FF8F], a
-	SAVE_AND_SWITCH_ROM_BANK 3
+	SAVE_AND_SWITCH_ROM_BANK BANK("banked level data set 3")  ;  3
 	call $4823
 	RESTORE_ROM_BANK
 	ret
@@ -5366,7 +5376,7 @@ CheckPipeForWarp:: ; 22A9
 	ldh a, [$FFF9]		; $0A in underground?
 	and a
 	jr nz, .out
-	SAVE_AND_SWITCH_ROM_BANK 3
+	SAVE_AND_SWITCH_ROM_BANK BANK("banked level data set 3")  ;  3
 	ldh a, [hLevelIndex]
 	add a
 	ld e, a
@@ -5454,7 +5464,7 @@ CheckBlockForItem:: ; 2321
 	push hl
 	push de
 	push bc
-	SAVE_AND_SWITCH_ROM_BANK 3
+	SAVE_AND_SWITCH_ROM_BANK BANK("banked level data set 3")  ;  3
 	ldh a, [hLevelIndex]
 	add a
 	ld e, a
