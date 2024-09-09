@@ -27,6 +27,8 @@
 ;* Rev 3.0 - 27-Aug-20 : Register ordering, byte-based sizes, OAM additions, general cleanup (Blitter Object)
 ;* Rev 4.0 - 03-May-21 : Updated to use RGBDS 0.5.0 syntax, changed IEF_LCDC to IEF_STAT (Eievui)
 
+INCLUDE "inc/settings.inc"
+
 IF __RGBDS_MAJOR__ == 0 && __RGBDS_MINOR__ < 5
     FAIL "This version of 'hardware.inc' requires RGBDS version 0.5.0 or later."
 ENDC
@@ -75,7 +77,11 @@ DEF _TILEMAP_SCREEN_HEIGHT EQU 18
 
 DEF rRAMG        EQU $0000 ; $0000->$1fff
 if def(TARGET_MEGADUCK)
-DEF rROMB0       EQU $0001 ; $0001->$0001
+    if def(MEGADUCK_MBC5)
+        DEF rROMB0       EQU $2000
+    else
+        DEF rROMB0       EQU $0001 ; $0001->$0001
+    endc
 else
 DEF rROMB0       EQU $2000 ; $2000->$2fff
 endc
@@ -516,6 +522,7 @@ DEF AUDTERM_3_RIGHT EQU %00000100
 DEF AUDTERM_2_RIGHT EQU %00000010
 DEF AUDTERM_1_RIGHT EQU %00000001
 
+DEF AUDTERM_ALL_ON  EQU (AUDTERM_4_LEFT | AUDTERM_3_LEFT | AUDTERM_2_LEFT | AUDTERM_1_LEFT | AUDTERM_4_RIGHT | AUDTERM_3_RIGHT | AUDTERM_2_RIGHT | AUDTERM_1_RIGHT)
 
 ; --
 ; -- AUDENA/NR52 ($FF26)
