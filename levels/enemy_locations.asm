@@ -298,6 +298,7 @@ level_2_3_enemies:
 	db $B0, $0C, DRAGONZAMASU
 	db $FF ; end of list
 
+; TODO: MegaDuck: Document the presence and range of this in bank3.s
 SECTION "level 3_1 enemies", ROMX[$4E74], BANK[3]
 
 level_3_1_enemies:
