@@ -540,15 +540,8 @@ Jmp_4966:: ; 4966
 
 INCBIN "baserom.gb", $CA94, $4E74 - $4A94
 
-; TODO: MegaDuck Move into audio_driver.asm
-IF DEF(TARGET_MEGADUCK)
-    ; SECTION "banked audio", ROMX, BANK[4]  ; #MD: Made ROMX section relative instead of abs and moved to Bank 4
-    SECTION "banked audio", ROMX[$4FBC], BANK[4]  ; #MD: Made ROMX section relative instead of abs and moved to Bank 4
-ELSE
-    SECTION "banked audio", ROMX[$503F], BANK[3]
-ENDC
+SECTION "banked audio", ROMX[$503F], BANK[3]
 
-; TODO: MegaDuck: Some of this data may need to be grouped with Bank 3 level data
 INCBIN "baserom.gb", $D03F, $6600 - $503F
 
 Data_6600:
@@ -616,8 +609,9 @@ _UpdateSound__6662:: ; 6662
 	push de
 	push hl
 	ld a, $03		; Cartridge doesn't have RAM, and it's not even the correct
-    IF DEF(TARGET_MEGADUCK)
+    IF DEF(TARGET_MEGADUCK)  ; #MD: Patch: OK (no addr change)
         ; This may trigger unwanted MBC write for some implementations of the MegaDuck MBC
+        nop
         nop
         nop
     ELSE
@@ -879,7 +873,7 @@ ContinueSquareSFX:
 	ld [$DFE1], a
 	ldh [rNR10], a  ; #MD: OK
 
-    IF DEF(TARGET_MEGADUCK)
+    IF DEF(TARGET_MEGADUCK)  ; #MD: Patch: OK (no addr change)
         ld a, $80 ; MegaDuck NR12 Nybble swap
     ELSE
     	ld a, $08
@@ -1021,20 +1015,21 @@ ContinueInjurySFX::
 	ld a, [hl]
 	and a
 	jp z, ContinueSquareSFX.stop
+    ld c, LOW(rNR12)
+    IF DEF(TARGET_MEGADUCK)  ; #MD: Patch: DONE (reason: added 2 bytes)
 
-	ld c, LOW(rNR12)  ; #MD: OK
-    IF DEF(TARGET_MEGADUCK)
-        ; MegaDuck NR12 Nybble Swap
-        swap a
-    ENDC
-	ld [$FF00+c], a     ; NR12  ; #MD: OK
+         jp MegaDuckPatch__ContinueInjurySFX__for_68E9
+            ; ; At patch:
+            ; swap a              ; MegaDuck NR12 Nybble Swap
+            ; ldh [c], a          ; NR12  ; #MD: OK
+            ; inc c               ; MegaDuck NR12 -> 14 Compensate for reordered register addresses
+        .megaduck_patch_return__68EC
 
-    IF DEF(TARGET_MEGADUCK)
-        ; MegaDuck NR12 -> 14 Compensate for reordered register addresses
+    ELSE
+        ldh [c], a          ; NR12  ; #MD: OK
+        inc c               ; Increment to NR14  ; #MD: OK
         inc c
     ENDC
-	inc c               ; Increment to NR14  ; #MD: OK
-	inc c
 	ld a, $87			; 609.6 Hz? Trigger
 	ld [$FF00+c], a		; rNR14  ; #MD: OK
 
@@ -1142,12 +1137,18 @@ ContinueDeathCrySFX:: ; 697C
 	ld a, [hl]
 	and a
 	jr z, ContinueNoiseSFX.stop
-    IF DEF(TARGET_MEGADUCK)
-        ; MegaDuck NR43 nybble swap
-        swap a
+    IF DEF(TARGET_MEGADUCK)  ; #MD: Patch: DONE (reason added 1 byte)
+
+         jp MegaDuckPatch__ContinueDeathCrySFX__for_6990
+            ; ; At patch:
+            ; swap a              ; MegaDuck NR12 Nybble Swap
+            ; ldh [rNR43], a      ; noise characteristics  ; #MD: OK
+            ; ret
+            ; No jump back needed due to ret
+    ELSE
+    	ldh [rNR43], a		; noise characteristics  ; #MD: OK
+	    ret
     ENDC
-	ldh [rNR43], a		; noise characteristics  ; #MD: OK
-	ret
 
 FireBreathChannelData:: ; 6993
 	db $00, $6D, $54, $80
@@ -1175,7 +1176,7 @@ ContinueNoiseSFX:: ; 69AF
 	xor a
 	ld [$DFF9], a
 
-    IF DEF(TARGET_MEGADUCK)
+    IF DEF(TARGET_MEGADUCK)  ; #MD: Patch: OK (no addr change)
         ; MegaDuck NR42 nybble swap
         ld a, $80
     ELSE
@@ -1219,108 +1220,32 @@ sfx_play__Jmp_69C6:: ; 69C6
 
 ; copy HL to channel registers
 
-; #MD Handles register address order changes for all channels
-;     which breaks expectation of writes in sequential order.
-;     Solve it by using direct writes to registers instead
-SetupChannel:: ; 69E5
-IF DEF(TARGET_MEGADUCK)
-    .square1:
-        ; #MD Writes NR10 -> NR14 (5)
-        ld   a, [hl+]
-        ldh  [rNR10], a
+IF DEF(TARGET_MEGADUCK)  ; #MD: Patch: DONE (reason: addr change)
 
-        ld   a, [hl+]
-        ldh  [rNR11], a
+        ; #MD Handles register address order changes for all channels
+        ;     which breaks expectation of writes in sequential order.
+        ;     Solve it by using direct writes to registers instead
+        ;
+        ; Relocated entire rewritten function
+        ; See: MegaDuckPatch__SetupChannel__for_69E5:
+        ;
+        ; Now 34 unused bytes
+    SetupChannel:: ; 69E5
+        jp  MegaDuckPatch__SetupChannel__for_69E5  ; This probably isn't needed, but just in case
+        .square1
+            jp  MegaDuckPatch__SetupChannel__for_69E5.square1
+        .square2
+            jp  MegaDuckPatch__SetupChannel__for_69E5.square2
+        .wave
+            jp  MegaDuckPatch__SetupChannel__for_69E5.wave
+        .noise
+            jp  MegaDuckPatch__SetupChannel__for_69E5.noise
 
-        ; #MD NR12 needs nybble swap
-        ld   a, [hl+]
-        swap a
-        ldh  [rNR12], a
-
-        ld   a, [hl+]
-        ldh  [rNR13], a
-
-        ld   a, [hl+]
-        ldh  [rNR14], a
-        ret
-
-    .square2
-        ; #MD Writes NR21 -> NR24 (4)
-        ld   a, [hl+]
-        ldh  [rNR21], a
-
-        ; #MD NR22 needs nybble swap
-        ld   a, [hl+]
-        swap a
-        ldh  [rNR22], a
-
-        ld   a, [hl+]
-        ldh  [rNR23], a
-
-        ld   a, [hl+]
-        ldh  [rNR24], a
-        ret
-
-    ; #MD: This block might never get called? Could just be a RET?
-    .wave
-        ; #MD Writes NR30_REG -> NR34 (5)
-        ld   a, [hl+]
-        ldh  [rNR30], a
-
-        ld   a, [hl+]
-        ldh  [rNR31], a
-
-        ; Audio driver may be encoding channel status into unused bit 3 in NR32
-        bit  CH3_SOME_FLAG_BIT, a
-        jr nz, .NR32_bit_preserve
-            ; #MD NR32: Translate volume. New Volume = ((0x00 - Volume) & 0x60)
-            ; GB: Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
-            ; MD: Bits:6..5 : 00 = mute, 11 = 100%, 10 = 50%, 01 = 25%
-            ld   a, [hl+]
-            cpl
-            add $20 ; start bit rollover at bit 5 to ignore possible values in lower bits (vs add 1)
-            jr .NR32_bit_handle_done
-
-        .NR32_bit_preserve
-            and $60            ; #MD NR32: Translate volume. New Volume = ((0x00 - Volume) & 0x60)
-            ; GB: Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
-            ; MD: Bits:6..5 : 00 = mute, 11 = 100%, 10 = 50%, 01 = 25%
-            ld   a, [hl+]
-            cpl
-            add $20 ; start bit rollover at bit 5 to ignore possible values in lower bits (vs add 1)
-            and $60
-            set   CH3_SOME_FLAG_BIT, a  ; restore flag since it was set earlier
-
-        .NR32_bit_handle_done
-
-        ldh  [rNR32], a
-
-        ld   a, [hl+]
-        ldh  [rNR33], a
-
-        ld   a, [hl+]
-        ldh  [rNR34], a
-        ret
-
-    .noise:
-        ; #MD Writes NR41 -> NR44 (4)
-        ld   a, [hl+]
-        ldh  [rNR41], a
-
-        ; #MD NR42 needs nybble swap
-        ld   a, [hl+]
-        swap a
-        ldh  [rNR42], a
-
-        ; #MD NR43 needs nybble swap
-        ld   a, [hl+]
-        swap a
-        ldh  [rNR43], a
-
-        ld   a, [hl+]
-        ldh  [rNR44], a
-        ret
+        REPT (34 - (5 * 3)) ; 5 absolute jumps
+            nop
+        ENDR
     ELSE
+SetupChannel:: ; 69E5
     .square1
     	push bc
     	ld c, LOW(rNR10)  ; #MD: OK
@@ -1350,8 +1275,8 @@ IF DEF(TARGET_MEGADUCK)
     	dec b
     	jr nz, .loopCopy
     	pop bc
-ENDC
     	ret
+ENDC
 
 ; do a lookup in HL
 LookupSoundPointer:: ; 6A07
@@ -1416,7 +1341,7 @@ _InitSound:: ; 6A33
 	ld a, AUDTERM_ALL_ON ; $FF
 	ldh [rNR51], a	; enable all channels to both outputs
 .muteChannels
-    IF DEF(TARGET_MEGADUCK)
+    IF DEF(TARGET_MEGADUCK)  ; #MD: Patch: OK (no addr change)
         ; MegaDuck NR12/22/42 Nybble swap
         ld a, $80
     ELSE
@@ -1692,7 +1617,7 @@ Jmp_6C00: ; 6C00
 	ld c, a
 	inc l
 	inc l
-	ld [hl], e					; DFx6- will go into NRx2 ; ?? #MD: TODO: MegaDuck nybble swap and more? (Huh, noticed that I missed this in Tetris...)
+	ld [hl], e					; DFx6- will go into NRx2
 	inc l
 	ld [hl], d					; DFx7 - always 0 or 6F
 	inc l
@@ -1962,10 +1887,11 @@ PlayMusic:: ; 6CBE
 	jr .jmp_6D78
 
 .jmp_6D73
-    IF DEF(TARGET_MEGADUCK)
+    IF DEF(TARGET_MEGADUCK)  ; #MD: Patch: OK (no addr change)
     ; Handle changed register address order
         ld   c, LOW(rNR11)  ; #MD: OK
         ld   a, $00
+        nop
     ELSE
         ; For GB why not just load LOW(rNR11) directly instead of by -1 then inc c? Result is not tested...
         ld c, LOW(rNR10)  ; #MD: OK
@@ -1979,12 +1905,7 @@ PlayMusic:: ; 6CBE
 	inc l
 	ldd a, [hl]				; DFx7
 	and a
-    ; #MD Due to code changes jump exceeds jr limit, so need a jp
-    IF DEF(TARGET_MEGADUCK)
-        jp   nz, .jmp_6DCE  ; .hasWavRam
-    ELSE
-        jr   nz, .jmp_6DCE  ; .hasWavRam
-    ENDC
+    jr   nz, .jmp_6DCE  ; .hasWavRam
 	ldi a, [hl]				; DFx6
 	ld e, a
 
@@ -2031,90 +1952,14 @@ PlayMusic:: ; 6CBE
 	ld a, d
 	ld [$FF00+c], a			; NRx1
 
-    IF DEF(TARGET_MEGADUCK)
-                                                                        ; Formerly 6d21-6d2d
-        ; Select channel to load based on address lower byte in C (NRx1)
+    IF DEF(TARGET_MEGADUCK)  ; #MD: Patch: DONE: (reason: addr change)
+        jp MegaDuckPatch__jmp_6D8D__for_6D9A
 
-            ; Bit 6 only set on rNR41 addr lower byte (0xFF40) for MegaDuck
-            bit 6, c
-            jr nz, .megaduck_load_nr42_to_nr43
-
-            ; Bit 3 only set on rNR31 addr lower byte (0xFF2B) for MegaDuck
-            bit 3, c
-            jr nz, .megaduck_load_nr32_to_nr33
-
-            ; Bit 0 only set on rNR21 addr lower byte (0xFF25) for MegaDuck
-            bit 0, c
-            jr nz, .megaduck_load_nr22_to_nr23
-
-            ; Otherwise drop through to rNR11 (0xFF22)
-
-            .megaduck_load_nr12_to_nr13:
-            ; #MD NR12 needs nybble swap
-            ld   a, e
-            swap a
-            ldh  [rNR12], a
-
-            ld   a, [hl+]
-            ldh  [rNR13], a
-
-            ; Prep next write
-            ld   c, LOW(rNR14)
-            jp .megaduck_load_nrx2_to_nrx3_done
-
-        .megaduck_load_nr22_to_nr23:
-            ; #MD NR22 needs nybble swap
-            ld   a, e
-            swap a
-            ldh  [rNR22], a
-
-            ld   a, [hl+]
-            ldh  [rNR23], a
-
-            ; Prep next write
-            ld   c, LOW(rNR24)
-            jp .megaduck_load_nrx2_to_nrx3_done
-
-        .megaduck_load_nr32_to_nr33:
-            ; #MD NR32: Translate volume. New Volume = ((0x00 - Volume) & 0x60)
-            ; GB: Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
-            ; MD: Bits:6..5 : 00 = mute, 11 = 100%, 10 = 50%, 01 = 25%
-            ld   a, e
-            cpl
-            add $20 ; start bit rollover at bit 5 to ignore possible values in lower bits (vs add 1)
-            and $60
-
-            ; Audio driver may be encoding channel status into unused bit 3 in NR32
-            bit  CH3_SOME_FLAG_BIT, e
-            jr z, .NR32_bit_handle_done
-                set  CH3_SOME_FLAG_BIT, a
-            .NR32_bit_handle_done
-
-            ldh  [rNR32], a
-
-            ld   a, [hl+]
-            ldh  [rNR33], a
-
-            ; Prep next write
-            ld   c, LOW(rNR34)
-            jp .megaduck_load_nrx2_to_nrx3_done
-
-        .megaduck_load_nr42_to_nr43:
-            ; #MD NR42 needs nybble swap
-            ld   a, e
-            swap a
-            ldh  [rNR42], a
-
-            ; #MD NR43 needs nybble swap
-            ld   a, [hl+]
-            swap a
-            ldh  [rNR43], a
-
-            ; Prep next write
-            ld   c, LOW(rNR44)
-
-        .megaduck_load_nrx2_to_nrx3_done:
-        ; C now has corrected MegaDuck NRx4 address low byte
+        ; 7 Bytes in original code, so a little padding
+        REPT 4
+            nop
+        ENDR
+        .megaduck_patch_return__6DA0
     ELSE
     	inc c
     	ld a, e
@@ -2167,12 +2012,7 @@ PlayMusic:: ; 6CBE
 .jmp_6DCE
 	ld b, $00
 	inc l
-    ; #MD Due to code changes jump exceeds jr limit, so need a jp
-    IF DEF(TARGET_MEGADUCK)
-        jp   .jmp_6D81  ; .after_hasWavRam
-    ELSE
-        jr   .jmp_6D81  ; .after_hasWavRam
-    ENDC
+    jr   .jmp_6D81  ; .after_hasWavRam
 
 .call_6DD3
 	ld a, b
@@ -2256,19 +2096,29 @@ PlayMusic:: ; 6CBE
 	ld [$FF00+c], a		; freq lo
 
     ; #MD NR14,NR24,NR34 OK
-    IF DEF(TARGET_MEGADUCK)
-        ; #MD Fix address scrambling for CH3 (NR33->NR34), CH1 & CH2 OK
-        ; Bit 2 only set on rNR33 addr lower byte (0xFF2E) for MegaDuck. Not set for NR13 (0xFF23) and NR23 (0xFF28)
-        bit 2, c
-        jr z, .megaduck_nr14_nr24_skip_nr34_addr_fix
-            ; Fix c for NR34 (0xFF2D) so next inc will get it to the right NR34 address for MD
-            dec c
-            dec c
-        .megaduck_nr14_nr24_skip_nr34_addr_fix:
+    IF DEF(TARGET_MEGADUCK)  ; #MD: Patch: DONE: (reason: addr change)
+
+         jp MegaDuckPatch__jmp_6E34__for_6E38
+            ; ; At patch:
+            ; ; #MD Fix address scrambling for CH3 (NR33->NR34), CH1 & CH2 OK
+            ; ; Bit 2 only set on rNR33 addr lower byte (0xFF2E) for MegaDuck. Not set for NR13 (0xFF23) and NR23 (0xFF28)
+            ; bit 2, c
+            ; jr z, .megaduck_nr14_nr24_skip_nr34_addr_fix
+            ;     ; Fix c for NR34 (0xFF2D) so next inc will get it to the right NR34 address for MD
+            ;     dec c
+            ;     dec c
+            ; .megaduck_nr14_nr24_skip_nr34_addr_fix:
+
+            ; ; BEGIN Existing Code
+            ; inc c
+            ; ld a, h
+            ; ldh [c], a      ; freq hi
+        .megaduck_patch_return__6E3B
+    ELSE
+    	inc c
+    	ld a, h
+    	ldh [c], a		; freq hi
     ENDC
-	inc c
-	ld a, h
-	ld [$FF00+c], a		; freq hi
 	jr .jmp_done_6DFC
 
 Data_6E3D:: ; 6E3D
@@ -2409,14 +2259,282 @@ Data_6F8F:: ; 6F8F
 	db 4, 8, 16, 32, 64, 128
 	db       24, 48, 96
 
+; SECTION "Music", ROMX[$6F98], BANK[3] (0x6F98 -> 0x7F07)
+
 IF DEF(TARGET_MEGADUCK)
-    SECTION "Banked Sound Wrappers", ROMX, BANK[4]  ; #MD: Made ROMX section relative instead of abs and moved to Bank 4
-ELSE
-    SECTION "Banked Sound Wrappers", ROMX[$7FF0], BANK[3]
-ENDC
+
+    ; MegaDuck patches: 0x7F08 - 0x7FEF = 232 bytes
+    SECTION "MegaDuck Patches", ROMX[$7F08], BANK[3]
+
+
+    MegaDuckPatch__ContinueDeathCrySFX__for_6990:
+        swap  a               ; MegaDuck NR43 nybble swap
+
+        ; BEGIN Existing Code
+        ldh   [rNR43], a      ; noise characteristics  ; #MD: OK
+        ret
+        ; No jump back needed due to ret
+
+    ; ============================================================
+
+
+    MegaDuckPatch__jmp_6E34__for_6E38:
+        ; #MD Fix address scrambling for CH3 (NR33->NR34), CH1 & CH2 OK
+        ; Bit 2 only set on rNR33 addr lower byte (0xFF2E) for MegaDuck. Not set for NR13 (0xFF23) and NR23 (0xFF28)
+        bit 2, c
+        jr z, .megaduck_nr14_nr24_skip_nr34_addr_fix
+            ; Fix c for NR34 (0xFF2D) so next inc will get it to the right NR34 address for MD
+            dec c
+            dec c
+        .megaduck_nr14_nr24_skip_nr34_addr_fix:
+
+        ; BEGIN Existing Code
+        inc c
+        ld a, h
+        ldh [c], a      ; freq hi
+        jp PlayMusic.megaduck_patch_return__6E3B ; (jmp_6E34.)
+
+    ; ============================================================
+
+
+    MegaDuckPatch__SetupChannel__for_69E5:
+
+        ; Relocated entire rewritten function
+
+        ; #MD Handles register address order changes for all channels
+        ;     which breaks expectation of writes in sequential order.
+        ;     Solve it by using direct writes to registers instead
+        .square1:
+            ; #MD Writes NR10 -> NR14 (5)
+            ld   a, [hl+]
+            ldh  [rNR10], a
+
+            ld   a, [hl+]
+            ldh  [rNR11], a
+
+            ; #MD NR12 needs nybble swap
+            ld   a, [hl+]
+            swap a
+            ldh  [rNR12], a
+
+            ld   a, [hl+]
+            ldh  [rNR13], a
+
+            ld   a, [hl+]
+            ldh  [rNR14], a
+            ret
+
+        .square2
+            ; #MD Writes NR21 -> NR24 (4)
+            ld   a, [hl+]
+            ldh  [rNR21], a
+
+            ; #MD NR22 needs nybble swap
+            ld   a, [hl+]
+            swap a
+            ldh  [rNR22], a
+
+            ld   a, [hl+]
+            ldh  [rNR23], a
+
+            ld   a, [hl+]
+            ldh  [rNR24], a
+            ret
+
+        ; #MD: This block might never get called? Could just be a RET?
+        .wave
+            ; #MD Writes NR30_REG -> NR34 (5)
+            ld   a, [hl+]
+            ldh  [rNR30], a
+
+            ld   a, [hl+]
+            ldh  [rNR31], a
+
+            ; Audio driver may be encoding channel status into unused bit 3 in NR32
+            bit  CH3_SOME_FLAG_BIT, a
+            jr nz, .NR32_bit_preserve
+                ; #MD NR32: Translate volume. New Volume = ((0x00 - Volume) & 0x60)
+                ; GB: Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
+                ; MD: Bits:6..5 : 00 = mute, 11 = 100%, 10 = 50%, 01 = 25%
+                ld   a, [hl+]
+                cpl
+                add $20 ; start bit rollover at bit 5 to ignore possible values in lower bits (vs add 1)
+                jr .NR32_bit_handle_done
+
+            .NR32_bit_preserve
+                and $60            ; #MD NR32: Translate volume. New Volume = ((0x00 - Volume) & 0x60)
+                ; GB: Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
+                ; MD: Bits:6..5 : 00 = mute, 11 = 100%, 10 = 50%, 01 = 25%
+                ld   a, [hl+]
+                cpl
+                add $20 ; start bit rollover at bit 5 to ignore possible values in lower bits (vs add 1)
+                and $60
+                set   CH3_SOME_FLAG_BIT, a  ; restore flag since it was set earlier
+
+            .NR32_bit_handle_done
+
+            ldh  [rNR32], a
+
+            ld   a, [hl+]
+            ldh  [rNR33], a
+
+            ld   a, [hl+]
+            ldh  [rNR34], a
+            ret
+
+        .noise:
+            ; #MD Writes NR41 -> NR44 (4)
+            ld   a, [hl+]
+            ldh  [rNR41], a
+
+            ; #MD NR42 needs nybble swap
+            ld   a, [hl+]
+            swap a
+            ldh  [rNR42], a
+
+            ; #MD NR43 needs nybble swap
+            ld   a, [hl+]
+            swap a
+            ldh  [rNR43], a
+
+            ld   a, [hl+]
+            ldh  [rNR44], a
+            ret
+
+    ; ============================================================
+
+
+    ; #MD D in 1st (len), E in 2nd (env), then [HL], [HL+1] | $80
+    ;
+    ; CH1 comes from equiv to .startWritingToSq1
+    ; CH2 comes from equiv to.startWritingToSq2
+    ; CH3 comes from equiv to.getNonNoiseDataToWrite -> equiv to.contWave
+    ; CH4 comes from equiv to.noiseLoop
+    ;
+    ; Writes sequence of NRx1(d),NRx2(e),NRx3([hl+]),NRx4([hl] | $80)
+    ;
+    ; #MD Handles register address order changes for all channels
+    ;     which breaks expectation of writes in sequential order.
+    ;     Solve it by using direct writes to registers instead
+    ;
+    ; D in 1st (len)
+    ; #MD: NR11 / NR21 / NR31 / NR41 OK
+
+    MegaDuckPatch__jmp_6D8D__for_6D9A:
+        ; Select channel to load based on address lower byte in C (NRx1)
+
+            ; Bit 6 only set on rNR41 addr lower byte (0xFF40) for MegaDuck
+            bit 6, c
+            jr nz, .megaduck_load_nr42_to_nr43
+
+            ; Bit 3 only set on rNR31 addr lower byte (0xFF2B) for MegaDuck
+            bit 3, c
+            jr nz, .megaduck_load_nr32_to_nr33
+
+            ; Bit 0 only set on rNR21 addr lower byte (0xFF25) for MegaDuck
+            bit 0, c
+            jr nz, .megaduck_load_nr22_to_nr23
+
+            ; Otherwise drop through to rNR11 (0xFF22)
+
+            .megaduck_load_nr12_to_nr13:
+            ; #MD NR12 needs nybble swap
+            ld   a, e
+            swap a
+            ldh  [rNR12], a
+
+            ld   a, [hl+]
+            ldh  [rNR13], a
+
+            ; Prep next write
+            ld   c, LOW(rNR14)
+            jp .megaduck_load_nrx2_to_nrx3_done
+
+        .megaduck_load_nr22_to_nr23:
+            ; #MD NR22 needs nybble swap
+            ld   a, e
+            swap a
+            ldh  [rNR22], a
+
+            ld   a, [hl+]
+            ldh  [rNR23], a
+
+            ; Prep next write
+            ld   c, LOW(rNR24)
+            jp .megaduck_load_nrx2_to_nrx3_done
+
+        .megaduck_load_nr32_to_nr33:
+            ; #MD NR32: Translate volume. New Volume = ((0x00 - Volume) & 0x60)
+            ; GB: Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
+            ; MD: Bits:6..5 : 00 = mute, 11 = 100%, 10 = 50%, 01 = 25%
+            ld   a, e
+            cpl
+            add $20 ; start bit rollover at bit 5 to ignore possible values in lower bits (vs add 1)
+            and $60
+
+            ; Audio driver may be encoding channel status into unused bit 3 in NR32
+            bit  CH3_SOME_FLAG_BIT, e
+            jr z, .NR32_bit_handle_done
+                set  CH3_SOME_FLAG_BIT, a
+            .NR32_bit_handle_done
+
+            ldh  [rNR32], a
+
+            ld   a, [hl+]
+            ldh  [rNR33], a
+
+            ; Prep next write
+            ld   c, LOW(rNR34)
+            jp .megaduck_load_nrx2_to_nrx3_done
+
+        .megaduck_load_nr42_to_nr43:
+            ; #MD NR42 needs nybble swap
+            ld   a, e
+            swap a
+            ldh  [rNR42], a
+
+            ; #MD NR43 needs nybble swap
+            ld   a, [hl+]
+            swap a
+            ldh  [rNR43], a
+
+            ; Prep next write
+            ld   c, LOW(rNR44)
+
+        .megaduck_load_nrx2_to_nrx3_done:
+        ; C now has corrected MegaDuck NRx4 address low byte
+
+        ; Done, return to original code
+        jp PlayMusic.megaduck_patch_return__6DA0 ; (jmp_6D8D.)
+
+
+ENDC ; For: SECTION "MegaDuck Patches"
+
+
+SECTION "Banked Sound Wrappers", ROMX[$7FF0], BANK[3]
 ; gets called from timer interrupt
 UpdateSoundWrapper__7FF0:: ; 7FF0
     jp _UpdateSound__6662
 
 InitSound:: ; 7FF3
 	jp _InitSound
+
+
+IF DEF(TARGET_MEGADUCK)
+    ; MegaDuck patches: 0x7FF6 - 0x7FFF = 10 bytes
+    SECTION "MegaDuck Patches End of ROM", ROMX[$7FF6], BANK[3]
+
+    ; 8 Bytes
+    MegaDuckPatch__ContinueInjurySFX__for_68E9:
+        swap a              ; MegaDuck NR12 Nybble Swap
+
+        ; BEGIN Existing Code
+        ldh [c], a          ; NR12  ; #MD: OK
+        inc c               ; Increment to NR14  ; #MD: OK
+        inc c
+        ; END Existing Code
+
+        inc c               ; MegaDuck NR12 -> 14 One more inc to compensate for reordered register addresses
+        jp ContinueInjurySFX.megaduck_patch_return__68EC
+
+ENDC

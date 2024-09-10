@@ -1,11 +1,7 @@
 INCLUDE "music_macros.asm"
 INCLUDE "inc/hardware.inc"
 
-IF DEF(TARGET_MEGADUCK)
-    SECTION "Music", ROMX[$6F98], BANK[4]  ; #MD: Moved to Bank 4
-ELSE
-    SECTION "Music", ROMX[$6F98], BANK[3]
-ENDC
+SECTION "Music", ROMX[$6F98], BANK[3]
 
 
 Song_6F98::
