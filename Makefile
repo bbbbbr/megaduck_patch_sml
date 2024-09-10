@@ -74,6 +74,12 @@ $(BIN_DUCK_MBC5): $(OBJECTS_DUCK_MBC5)
 romusage:
 	romusage $(BINDIR_DUCK)/supermarioland_md2.map -g -sRp
 
+bindiff_duck:
+	vbindiff $(BIN_GB) $(BIN_DUCK)
+
+bindiff_gbref:
+	vbindiff baserom.gb $(BIN_GB)
+
 # create necessary directories after Makefile is parsed but before build
 # info prevents the command from being pasted into the makefile
 $(info $(shell mkdir -p $(MKDIRS)))
