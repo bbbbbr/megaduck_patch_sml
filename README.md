@@ -1,6 +1,17 @@
-# Super Mario Land Disassembly
+# MegaDuck SML patch
 
-Disassembly of the first Game Boy game I ever played
+This is a MegaDuck patch based on an extended version of the original dissasembly below.
+
+The following should be completely patched and working
+- Audio registers and bits
+- Display registers and bits
+- Bank Switching (.md2 style and a build with mbc1/3/5 style)
+
+The UPS style patch files are under the `/patch` folder
+
+# SML Disassembly
+
+Originally by: https://github.com/kaspermeerts/supermarioland
 
 This repository builds Super Mario Land (World) (Rev A) with SHA1 checksum `418203621b887caa090215d97e3f509b79affd3e`
 
