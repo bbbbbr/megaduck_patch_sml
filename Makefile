@@ -2,22 +2,28 @@
 .SUFFIXES:
 .SUFFIXES: .asm .o .gb
 
-INCDIR = inc
+UPS_PATCHTOOL_PATH = ~/git/gbdev/tools/UPS_patch_tools/linux_ups_x64/ups
 
-BINDIR = bin
+INCDIR   = inc
+BINDIR   = bin
+OBJDIR   = obj
+PATCHDIR = patch
 
 BINDIR_GB        = $(BINDIR)/gb
 BINDIR_DUCK      = $(BINDIR)/duck
 BINDIR_DUCK_MBC5 = $(BINDIR)/duck_mbc5
 
-BIN_GB        = $(BINDIR_GB)/supermarioland.gb
-BIN_DUCK      = $(BINDIR_DUCK)/supermarioland_md2.duck
-BIN_DUCK_MBC5 = $(BINDIR_DUCK_MBC5)/supermarioland_mbc5.duck
+BIN_GB           = $(BINDIR_GB)/supermarioland.gb
+BIN_DUCK         = $(BINDIR_DUCK)/supermarioland_md2.duck
+BIN_DUCK_MBC5    = $(BINDIR_DUCK_MBC5)/supermarioland_mbc5.duck
 
-OBJ = obj
-OBJ_GB        = $(OBJ)/gb
-OBJ_DUCK      = $(OBJ)/duck
-OBJ_DUCK_MBC5 = $(OBJ)/duck_mbc5
+PATCH_DUCK       = $(PATCHDIR)/supermarioland_md2.duck.patch.ups
+PATCH_DUCK_MBC5  = $(PATCHDIR)/supermarioland_mbc5.duck.patch.ups
+
+
+OBJ_GB           = $(OBJDIR)/gb
+OBJ_DUCK         = $(OBJDIR)/duck
+OBJ_DUCK_MBC5    = $(OBJDIR)/duck_mbc5
 
 OBJECTS_RAW := bank0.o bank1.o bank2.o bank3.o music.o levels/enemy_locations.o
 
@@ -25,7 +31,7 @@ OBJECTS_GB        = $(OBJECTS_RAW:%=$(OBJ_GB)/%)
 OBJECTS_DUCK      = $(OBJECTS_RAW:%=$(OBJ_DUCK)/%)
 OBJECTS_DUCK_MBC5 = $(OBJECTS_RAW:%=$(OBJ_DUCK_MBC5)/%)
 
-MKDIRS = $(BINDIR) $(OBJ_GB) $(OBJ_DUCK) $(OBJ_DUCK_MBC5) $(OBJ_GB)/levels $(OBJ_DUCK)/levels $(OBJ_DUCK_MBC5)/levels $(BINDIR_GB) $(BINDIR_DUCK) $(BINDIR_DUCK_MBC5)
+MKDIRS = $(BINDIR) $(OBJ_GB) $(OBJ_DUCK) $(OBJ_DUCK_MBC5) $(OBJ_GB)/levels $(OBJ_DUCK)/levels $(OBJ_DUCK_MBC5)/levels $(BINDIR_GB) $(BINDIR_DUCK) $(BINDIR_DUCK_MBC5) $(PATCHDIR)
 
 all: gb duck duck_mbc5 check
 
@@ -79,6 +85,11 @@ bindiff_duck:
 
 bindiff_gbref:
 	vbindiff baserom.gb $(BIN_GB)
+
+patches:
+	$(UPS_PATCHTOOL_PATH) diff --base $(BIN_GB) -modified $(BIN_DUCK) -output $(PATCH_DUCK) &
+	$(UPS_PATCHTOOL_PATH) diff --base $(BIN_GB) -modified $(BIN_DUCK_MBC5) -output $(PATCH_DUCK_MBC5) &
+
 
 # create necessary directories after Makefile is parsed but before build
 # info prevents the command from being pasted into the makefile
