@@ -5523,7 +5523,69 @@ Call_2363:: ; 2363
 
 ; too many calls to far banks
 GameState_0D::
-INCBIN "baserom.gb", $2376, $2401 - $2376
+; INCBIN "baserom.gb", $2376, $2401 - $2376
+    ldh  a, [hGamePaused]   ; hGamePaused = $FFB2
+    and  a
+    ret  nz
+    call Call_2198
+    call Call_4FB2
+    ld   a, [$D007]         ; _RAM_D007_
+    and  a
+    call nz, Jmp_1B45
+    call Call_84E
+    call Call_4FEC
+    call Call_5118
+    ldh  a, [hActiveRomBank]    ; hActiveRomBank = $FFFD
+    ldh  [hSavedRomBank], a ; hSavedRomBank = $FFE1
+    ld   a, $03
+    ldh  [hActiveRomBank], a    ; hActiveRomBank = $FFFD
+    ld   [rROMB0], a
+    call Jmp_4966.jmp_498B
+
+    ld   bc, $C218      ; _RAM_C218_
+    ld   hl, Data_216D  ; Data_216D = $216D
+    call Call_490D
+
+    ld   bc, $C228      ; _RAM_C228_
+    ld   hl, Data_216D  ; Data_216D = $216D
+    call Call_490D
+
+    ld   bc, $C238      ; _RAM_C238_
+    ld   hl, Data_216D  ; Data_216D = $216D
+    call Call_490D
+
+    ld   bc, $C248      ; _RAM_C248_
+    ld   hl, Data_216D  ; Data_216D = $216D
+    call Call_490D
+    call $4AEA          ; TODO: Bank 3 _LABEL_4AEA_
+    call $4B8A          ; TODO: Bank 3 _LABEL_4B8A_
+    call $4BB5          ; TODO: Bank 3 _LABEL_4BB5_
+    ldh  a, [hSavedRomBank] ; hSavedRomBank = $FFE1
+    ldh  [hActiveRomBank], a    ; hActiveRomBank = $FFFD
+    ld   [rROMB0], a
+    call Call_2491
+    ldh  a, [hActiveRomBank]    ; hActiveRomBank = $FFFD
+    ldh  [hSavedRomBank], a ; hSavedRomBank = $FFE1
+    ld   a, $02
+    ldh  [hActiveRomBank], a    ; hActiveRomBank = $FFFD
+    ld   [rROMB0], a
+    call UpdateTimerAndFloaties
+    ldh  a, [hSavedRomBank] ; hSavedRomBank = $FFE1
+    ldh  [hActiveRomBank], a    ; hActiveRomBank = $FFFD
+    ld   [rROMB0], a
+    call Call_1736
+    call Call_5118.jmp_515E
+    call Call_1F03
+    ldh  a, [hFrameCounter] ; hFrameCounter = $FFAC
+    and  $03
+    ret  nz
+    ld   a, [$C203]      ; _RAM_C203_
+    xor  $01
+    ld   [$C203], a      ; _RAM_C203_
+    ret
+
+
+
 
 AnimateBackground:: ; 2401
 	ld a, [wBackgroundAnimated]
