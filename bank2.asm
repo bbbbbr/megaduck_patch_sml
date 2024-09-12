@@ -1224,5 +1224,10 @@ INCBIN "baserom.gb", $9F15, $6002 - $5F15
 SECTION "bank 2 levels", ROMX[$6190], BANK[2]
 INCBIN "baserom.gb", $A190, $791A - $6190
 
-INCBIN "gfx/menuTiles1.2bpp"
+; Changes for the Title screen gfx to add MegaDuck
+IF DEF(TARGET_MEGADUCK)
+    INCBIN "gfx/menuTiles1_megaduck.2bpp"
+ELSE
+    INCBIN "gfx/menuTiles1.2bpp"
+ENDC
 INCBIN "gfx/menuTiles2.2bpp"
