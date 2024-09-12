@@ -1,22 +1,22 @@
 # MegaDuck SML patch
 
-This is a MegaDuck patch based on an extended version of the original disassembly at https://github.com/kaspermeerts/supermarioland
+This is a MegaDuck patch based on an extended version of the [original disassembly](https://github.com/kaspermeerts/supermarioland) by kaspermeerts
 
 The following should be completely patched and working
 - Audio registers and bits
 - Display registers and bits
 - Bank Switching (.md2 style and a build with mbc1/3/5 style)
 
-The UPS style patch files are under the `/patch` folder
+The Patches can be downloaded from [itch.io](https://bbbbbr.itch.io/mega-duck-patch-for-super-mario-land-game-boy):
 
 
 Original Readme for below:
 
-==================================
+---------------------------------
 
 # SML Disassembly
 
-This repository builds Super Mario Land (World) (Rev A) with SHA1 checksum `418203621b887caa090215d97e3f509b79affd3e`
+This repository builds SML (World) (Rev A) with SHA1 checksum `418203621b887caa090215d97e3f509b79affd3e`
 
 As of now it requires a copy of the original ROM named "baserom.gb" to be placed in the repository, to fill in sections which have not been disassembled yet. The goal is to make this step obsolete.
 
