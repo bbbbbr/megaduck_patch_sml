@@ -16,6 +16,7 @@ SECTION "RST 0", ROM0[$0000]
 SECTION "RST 8", ROM0[$0008]
 	jp Init
 
+
 SECTION "RST 28", ROM0[$0028]
 ; Immediately following the return address is a jump table
 ; A is used as index
@@ -31,6 +32,14 @@ TableJump::
 	push de		; Jump to the target address
 	pop hl
 	jp hl
+
+
+IF DEF(TARGET_MEGADUCK)
+    ; Crash handler - try to reset if something went wrong
+    SECTION "RST 38", ROM0[$0038] ; 0xFF instruction
+    jp Init
+ENDC
+
 
 ; Interrupts
 SECTION "Interrupt VBlank", ROM0[$0040]
@@ -57,7 +66,7 @@ VBlank:: ; $0060
 	push bc
 	push de
 	push hl
-	call DrawColumn		; Drawing new areas of the map
+    call DrawColumn		; Drawing new areas of the map
 	call Call_1B86		; Collision with coins, coin blocks, etc...?
 	call UpdateLives
 	call hDMARoutine
@@ -249,46 +258,94 @@ Init::	; 0185
 	ld [hl], (AUDVOL_LEFT_MAX | AUDVOL_RIGHT_MAX) ; $77	; NR50 Turn the volume up to the max        ; #MD: OK  ; $01B8
 	ld sp, $CFFF
 
-	xor a
-	ld hl, $DFFF	; End of Work RAM
-	ld c, $40
-	ld b, 0			; CB = $4000, size of Work RAM
-.clearWRAMloop		; Also clears non-existent cartridge RAM. Bug?
-	ldd [hl], a
-	dec b
-	jr nz, .clearWRAMloop
-	dec c			; Why this doesn't use a loop on BC is beyond me...
-	jr nz, .clearWRAMloop
 
-	ld hl, $9FFF	; End of Video RAM
-	ld c, $20		; CB = $2000, size of Video RAM
-	xor a			; Unnecessary
-	ld b, 0
-.clearVRAMloop
-	ldd [hl], a
-	dec b
-	jr nz, .clearVRAMloop
-	dec c
-	jr nz, .clearVRAMloop
+    IF DEF(MEGADUCK_FIX_RAM_INIT)
+    ; MegaDuck RAM init Fixes:
+    ;  - Put of intended range bugs for clearing HRAM & OAM RAM to avoid stray writes to random parts of memory
+    ;  - Don't clear cart RAM that isn't expected to be there
 
-	ld hl, $FEFF	; End of OAM (well, over the end, bug?)
-	ld b, 0			; Underflow, clear $FF bytes
-.clearOAMloop
-	ldd [hl], a
-	dec b
-IF DEF(MEGADUCK_SAMEDUCK_TEMP_FIX)  ; FIXME : MegaDuck (due to an emulator patching memory corruption issue at the moment)
-    nop
-    nop
-ELSE
-	jr nz, .clearOAMloop
-ENDC
+    ; Clear WRAM
+        xor a
+        ld hl, _WRAM_END ; $DFFF            ; End of Work RAM
+        ld c, HIGH((_WRAM_END - _WRAM) + 1) ; $20 (size: $2000)
+        ld b, 0                             ; FIX: Only clear WRAM, don't spill over into Cart SRAM
+    .clearWRAMloop
+        ldd [hl], a
+        dec b
+        jr nz, .clearWRAMloop
+        dec c
+        jr nz, .clearWRAMloop
 
-	ld hl, $FFFE	; End of High RAM
-	ld b, $80		; Size of High RAM, off by one, bug?
-.clearHRAMloop
-	ldd [hl], a
-	dec b
-	jr nz, .clearHRAMloop
+    ; Clear VRAM
+        ld hl, _VRAM_END                    ; End of Video RAM
+        ld c, HIGH((_VRAM_END - _VRAM) + 1) ; $20 (size: $2000)
+        xor a                               ; Unnecessary
+        ld b, 0
+    .clearVRAMloop
+        ldd [hl], a
+        dec b
+        jr nz, .clearVRAMloop
+        dec c
+        jr nz, .clearVRAMloop
+
+    ; Clear OAM (0xFE00 - 0xFE9F)
+        ld hl, _OAMRAM_END ; $FE9F         ; Fix: End of OAM (fix, start at actual end of OAM RAM)
+        ld b, (_OAMRAM_END - _OAMRAM) + 1  ; Fix: Clear $160 bytes (don't clear "prohibited" memory after OAM range)
+    .clearOAMloop
+        ldd [hl], a
+        dec b
+        jr nz, .clearOAMloop
+
+    ; Clear HRAM (-xFF80 - 0xFFFE)
+        ld hl, _HRAM_END ; $FFFE              ; End of High RAM
+        ld b, (_HRAM_END - _HRAM) + 1 ; $7F   ; FIX: Size of High RAM (fix the +1 bug, don't write to unassigned register 0xFF7F)
+    .clearHRAMloop
+        ldd [hl], a
+        dec b
+        jr nz, .clearHRAMloop
+
+    ELSE ; Original Game Boy Version
+
+    ; Clear WRAM
+        xor a
+        ld hl, _WRAM_END ; $DFFF            ; End of Work RAM
+        ld c, HIGH((_WRAM_END - _SRAM) + 1) ; $40 <-- Note size reaching Cart SRAM instead of just WRAM
+        ld b, 0                             ;
+    .clearWRAMloop                          ; Also clears non-existent cartridge RAM. Bug?
+    	ldd [hl], a
+    	dec b
+    	jr nz, .clearWRAMloop
+    	dec c			; Why this doesn't use a loop on BC is beyond me...
+    	jr nz, .clearWRAMloop
+
+    ; Clear VRAM
+        ld hl, _VRAM_END                    ; End of Video RAM
+        ld c, HIGH((_VRAM_END - _VRAM) + 1) ; $20        ; CB = $2000, size of Video RAM
+        xor a                               ; Unnecessary
+    	ld b, 0
+    .clearVRAMloop
+    	ldd [hl], a
+    	dec b
+    	jr nz, .clearVRAMloop
+    	dec c
+    	jr nz, .clearVRAMloop
+
+    ; Clear OAM (0xFE00 - 0xFE9F)
+    	ld hl, $FEFF	; [beyond] End of OAM (well, over the end, bug?)
+    	ld b, 0			; Underflow, clear $FF bytes
+    .clearOAMloop
+    	ldd [hl], a
+    	dec b
+    	jr nz, .clearOAMloop
+
+    ; Clear HRAM (-xFF80 - 0xFFFE)
+    	ld hl, _HRAM_END	; End of High RAM
+        ld b, (_HRAM_END - _HRAM) + 1 + 1  ; $80		; Size of High RAM, off by one, bug?
+    .clearHRAMloop
+    	ldd [hl], a
+    	dec b
+    	jr nz, .clearHRAMloop
+    ENDC ; End: IF DEF(MEGADUCK_FIX_RAM_INIT) ... ELSE ...
 
 	ld c, LOW(hDMARoutine)
 	ld b, DMARoutineEnd - DMARoutine + 2 ; Bug
@@ -511,7 +568,7 @@ GameState_0E::
 	ld a, $0C
 	ldh [hLevelIndex], a
 	call Call_807			; Draw level into tile map TODO based on FFE4?
-	pop af
+    pop af
 	ldh [hLevelIndex], a
 	ld a, $3C
 	ld hl, $9800		; tile map

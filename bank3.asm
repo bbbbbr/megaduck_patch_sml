@@ -649,7 +649,14 @@ _UpdateSound__6662:: ; 6662
 	ld [$DFF8], a
 	ldh [hPauseUnpauseMusic], a
 	ld a, $07
-	ld [$00FF], a	; Bug continued
+    IF DEF(TARGET_MEGADUCK)  ; #MD: Patch: OK (no addr change)
+        ; This may trigger unwanted MBC write for some implementations of the MegaDuck MBC
+        nop
+        nop
+        nop
+    ELSE
+	   ld [$00FF], a	; Bug continued
+    ENDC
 	pop hl
 	pop de
 	pop bc

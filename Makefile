@@ -66,7 +66,7 @@ $(OBJ_DUCK)/%.o: %.asm $(INCDIR)/settings.inc $(INCDIR)/hardware.inc # Make sure
 
 $(BIN_DUCK): $(OBJECTS_DUCK)
 	@echo " LINK	$@"
-	rgblink -d -n $(BINDIR_DUCK)/supermarioland_md2.sym -m $(BINDIR_DUCK)/supermarioland_md2.map -o $@ $^
+	rgblink --pad 0xff -d -n $(BINDIR_DUCK)/supermarioland_md2.sym -m $(BINDIR_DUCK)/supermarioland_md2.map -o $@ $^
 
 
 $(OBJ_DUCK_MBC5)/%.o: %.asm $(INCDIR)/settings.inc $(INCDIR)/hardware.inc # Make sure inc files trigger rebuilds
@@ -75,7 +75,7 @@ $(OBJ_DUCK_MBC5)/%.o: %.asm $(INCDIR)/settings.inc $(INCDIR)/hardware.inc # Make
 
 $(BIN_DUCK_MBC5): $(OBJECTS_DUCK_MBC5)
 	@echo " LINK	$@"
-	rgblink -d -n $(BINDIR_DUCK_MBC5)/supermarioland_mbc5.sym -m $(BINDIR_DUCK_MBC5)/supermarioland_mbc5.map -o $@ $^
+	rgblink --pad 0xff -d -n $(BINDIR_DUCK_MBC5)/supermarioland_mbc5.sym -m $(BINDIR_DUCK_MBC5)/supermarioland_mbc5.map -o $@ $^
 
 romusage:
 	romusage $(BINDIR_DUCK)/supermarioland_md2.map -g -sRp
