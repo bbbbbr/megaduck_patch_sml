@@ -7,7 +7,8 @@ The following should be completely patched and working
 - Display registers and bits
 - Bank Switching (.md2 style and a build with mbc1/3/5 style)
 
-The UPS style patch files are under the `/patch` folder
+The Patches can be downloaded from itch.io:
+https://bbbbbr.itch.io/mega-duck-patch-for-super-mario-land-game-boy
 
 
 Original Readme for below:
